@@ -30,7 +30,15 @@ document.getElementById("login").addEventListener("submit", async (e) => {
 (async () => {
   try {
     const d = await (await fetch("/api/demo")).json();
-    if (!d.demo) return;
+    if (d.fehlt && d.fehlt.length) {
+      // Einrichtung unvollständig: klar sagen, was in Netlify fehlt
+      const h = document.createElement("div");
+      h.className = "login-fehler";
+      h.style.cssText = "margin-top:16px;text-align:left";
+      h.textContent = `Die Seite ist noch nicht fertig eingerichtet. In Netlify fehlt die Umgebungsvariable: ${d.fehlt.join(" und ")}. Danach einmal neu deployen.`;
+      document.getElementById("login").after(h);
+    }
+    if (!d.demo || (d.fehlt && d.fehlt.length)) return;
     document.title = "Demo · OTV C-Jugend";
     const p = d.personen;
     const box = document.createElement("div");

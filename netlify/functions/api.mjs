@@ -492,13 +492,16 @@ export default async (request) => {
   const methode = request.method;
   const secret = env("SESSION_SECRET");
 
-  if (!secret || (!istDemo() && (!env("ELTERN_PASSWORT") || !env("KASSE_PASSWORT")))) {
-    return fehler("Seite noch nicht eingerichtet: Umgebungsvariablen fehlen (siehe README).", 500);
+  // Ist das die Demo-Seite? (für die Anmeldeseite, ohne Sitzung). Nennt fehlende Einstellungen, nie deren Werte.
+  if (teile[0] === "demo" && !teile[1] && methode === "GET") {
+    const fehlt = [];
+    if (!secret) fehlt.push("SESSION_SECRET");
+    if (!istDemo() && !env("ELTERN_PASSWORT")) fehlt.push("DEMO_MODUS");
+    return json(istDemo() ? { demo: true, personen: DEMO_PERSONEN, fehlt } : { demo: false, fehlt });
   }
 
-  // Ist das die Demo-Seite? (für die Anmeldeseite, ohne Sitzung)
-  if (teile[0] === "demo" && !teile[1] && methode === "GET") {
-    return json(istDemo() ? { demo: true, personen: DEMO_PERSONEN } : { demo: false });
+  if (!secret || (!istDemo() && (!env("ELTERN_PASSWORT") || !env("KASSE_PASSWORT")))) {
+    return fehler("Seite noch nicht eingerichtet: Umgebungsvariablen fehlen (siehe README).", 500);
   }
 
   // Login ist die einzige Route ohne Sitzung
