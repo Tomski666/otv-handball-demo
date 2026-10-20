@@ -87,8 +87,84 @@ function demoLeiste() {
     });
   }
   l.innerHTML = `<span><strong>Demo</strong> mit erfundenen Daten · Du siehst die Seite als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)})</span>
-    <span class="demo-knoepfe"><button type="button" data-demo="wechseln">Rolle wechseln</button><button type="button" data-demo="zuruecksetzen">Zurücksetzen</button></span>`;
+    <span class="demo-knoepfe"><a href="#/funktionen">Funktionen</a><button type="button" data-demo="wechseln">Rolle wechseln</button><button type="button" data-demo="zuruecksetzen">Zurücksetzen</button></span>`;
 }
+// Funktionsübersicht (nur in der Demo)
+function seiteFunktionen() {
+  if (!Z.demo) return seiteStart();
+  const r = (...rollen) => `<span class="rollen">${rollen.map((x) => `<span class="rolle-${x}">${ROLLEN_NAME[x]}</span>`).join("")}</span>`;
+  const block = (titel, rollen, punkte, probier) => `<section class="karte funktion">
+    <div class="karte-kopf"><h2 style="margin:0">${titel}</h2>${rollen}</div>
+    <ul class="punkte-liste">${punkte.map((p) => `<li>${p}</li>`).join("")}</ul>
+    ${probier ? `<p class="probier"><strong>Probier aus:</strong> ${probier}</p>` : ""}
+  </section>`;
+  return `${kopfzeile("Demo", "Was kann die Seite?")}
+  <section class="karte hinweis-demo">
+    <p>Eine Seite für Eltern, Trainer und Kassenwart einer Jugendmannschaft. Sie ersetzt Listen in der WhatsApp-Gruppe, Zettel am Kuchenstand und das Kassenbuch auf Papier. Keine App aus dem Store, keine Benutzerkonten: ein Passwort pro Rolle, eingetragen wird nur der Vorname.</p>
+    <p><strong>Zur Demo:</strong> Alle Namen, Spiele und Beträge sind erfunden. Du kannst alles ausprobieren, eintragen und löschen. Die Daten werden <strong>jeden Tag neu angelegt</strong> und lassen sich oben über „Zurücksetzen“ sofort wiederherstellen. Über „Rolle wechseln“ siehst du die Seite als Elternteil, Trainer oder Kasse.</p>
+    <p class="leise klein">Du bist gerade angemeldet als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)}).</p>
+  </section>
+  <h2 class="bereich-titel">Für alle Eltern</h2>
+  ${block("Start: Deine Aufgaben", r("eltern", "trainer", "kasse"), [
+    "Oben steht, was du zugesagt hast: Standdienst, Kuchen, Fahrt, Zeitnehmer, Wäsche, Trikots, Termine.",
+    "Offene Rückmeldungen (Abfragen, Termine) erscheinen mit Frist, bis sie beantwortet sind.",
+    "Jeder Termin lässt sich mit einem Klick in den eigenen Kalender übernehmen.",
+    "Darunter die nächsten Spiele mit allem, was noch fehlt.",
+  ], "Als Elternteil die Startseite ansehen: Sandra hat Standdienst und noch zwei Rückmeldungen offen.")}
+  ${block("Spiele", r("eltern", "trainer", "kasse"), [
+    "Eine Karte pro Spiel mit allen Aufgaben: Standdienst, Mitbringliste, Zeitnehmer, Wäsche, Trikots und bei Auswärtsspielen Fahrgemeinschaften.",
+    "Standdienst mit Reserveplatz. Sagt jemand ab, rückt die Reserve automatisch nach.",
+    "Treffzeit in der Halle wird aus der Anwurfzeit berechnet, die Halle ist mit Route verlinkt.",
+    "Austragen geht auf dem eigenen Handy jederzeit, ohne jemanden fragen zu müssen.",
+    "Kalender-Abo: alle Spiele und Termine automatisch im Handykalender, Änderungen kommen von selbst nach.",
+  ], "Beim nächsten Heimspiel „Ich mache das“ beim Zeitnehmer drücken oder bei der Fahrt „Ben fährt mit“.")}
+  ${block("Infos & Termine", r("eltern", "trainer", "kasse"), [
+    "Infos vom Trainerteam mit Ablaufdatum, alte Infos verschwinden von selbst.",
+    "Abfragen mit Mehrfachauswahl (z. B. Ferientraining) oder Ja/Nein (z. B. Turnier), mit Frist und Übersicht, wer schon geantwortet hat.",
+    "Termine mit Rückmeldung, Personenzahl und Kostenbeitrag, die Kasse hakt ab, wer bezahlt hat.",
+  ], "Als Elternteil beim Ferientraining für Ben ankreuzen.")}
+  ${block("Kasse, transparent für alle", r("eltern", "trainer", "kasse"), [
+    "Kassenstand, Einnahmen nach Zahlungsart und Ausgaben nach Zweck.",
+    "Ergebnis je Heimspiel: was der Kuchenstand eingebracht hat.",
+    "Alle Buchungen einsehbar, Namen erscheinen dort nicht.",
+  ])}
+  ${block("Trikots, Mannschaft, Galerie", r("eltern", "trainer", "kasse"), [
+    "Trikot-Waschplan, der reihum durch alle Familien läuft. Tauschen geht selbst.",
+    "Mannschaft mit Trainerteam, Kader und Trainingszeiten samt Hallenadresse.",
+    "Optionale Fotogalerie mit Meldefunktion: Ein gemeldetes Foto ist sofort ausgeblendet.",
+    "Die Seite lässt sich auf dem Handy wie eine App auf den Startbildschirm legen.",
+  ])}
+  <h2 class="bereich-titel">Für das Trainerteam</h2>
+  ${block("Infos, Abfragen, Termine anlegen", r("trainer", "kasse"), [
+    "Trainer schreiben Infos, legen Abfragen und Termine an und sehen die Antworten gesammelt.",
+    "Fertiger WhatsApp-Text pro Spiel: Trainer-Infos oben, darunter was noch gesucht wird und wer schon eingetragen ist, mit Link zur Seite.",
+  ], "Als Trainer unter Infos eine neue Abfrage anlegen.")}
+  <h2 class="bereich-titel">Für die Kasse</h2>
+  ${block("Heimspiel abrechnen", r("kasse"), [
+    "Einmal nach dem Spiel ausfüllen: Einnahmen je Zahlungsart, verkaufte Getränke, Einkauf.",
+    "Daraus entstehen die Buchungen und ein fertiger Text für die WhatsApp-Gruppe.",
+    "Getränke: Der Standdienst zählt am Handy mit (Strichliste). Die Zahlen stehen in der Abrechnung schon drin.",
+    "Der Anteil, der an den Verein geht, wird automatisch berechnet und als offen geführt, bis er bezahlt ist.",
+  ], "Als Kasse unter Kasse „Heimspiel abrechnen“ öffnen: Das letzte Heimspiel ist vorausgewählt und die Strichliste schon eingetragen.")}
+  ${block("Kassenbuch", r("kasse"), [
+    "Einzelne Buchungen erfassen, ändern und löschen, mit Kategorie, Zahlungsart und Beleg.",
+    "Export als CSV für Excel.",
+  ])}
+  ${block("Verwaltung", r("kasse"), [
+    "Spielplan, Kader und Trainer pflegen.",
+    "Einstellungen: Plätze im Standdienst, Mitbringliste, Vorrat, Getränke mit Preisen, Hallen mit Adresse, Trainingszeiten.",
+    "Helferübersicht: wer wie oft Standdienst, Kuchen, Fahrten und Wäsche übernommen hat.",
+    "Namen zuordnen und bereinigen, damit überall nur Vorname und Sohn stehen.",
+  ], "Als Kasse unter Mehr › Verwaltung die Helferübersicht ansehen.")}
+  <h2 class="bereich-titel">Datenschutz und Technik</h2>
+  ${block("Sparsam mit Daten", r("eltern", "trainer", "kasse"), [
+    "Nur Vornamen, keine Nachnamen, keine Telefonnummern, keine Adressen.",
+    "Keine Benutzerkonten, keine Werbung, kein Tracking. Suchmaschinen sind ausgeschlossen.",
+    "Drei Passwörter: Eltern, Trainer, Kasse. Jede Rolle sieht und darf nur, was sie braucht.",
+    "Läuft im Browser auf jedem Handy, ohne Installation aus einem App-Store.",
+  ])}`;
+}
+
 // In der Demo bekommt jede Rolle eine feste Person, damit kein Namensdialog stört
 function demoPerson() {
   const p = Z.demo.person;
@@ -200,6 +276,7 @@ const SEITEN = {
   galerie: seiteGalerie,
   verwaltung: seiteVerwaltung,
   datenschutz: seiteDatenschutz,
+  funktionen: seiteFunktionen,
 };
 
 function meineTermine() {
@@ -1699,6 +1776,7 @@ function mehrMenue() {
     ["#/trikots", "", "Trikots waschen"], ["#/mannschaft", "", "Mannschaft und Training"],
     ...(Z.einstellungen.galerieAktiv || istAdmin() ? [["#/galerie", "📷", "Galerie"]] : []),
     ...(istAdmin() ? [["#/verwaltung", "⚙️", "Verwaltung"]] : []),
+    ...(Z.demo ? [["#/funktionen", "", "Was kann die Seite? (Demo)"]] : []),
   ];
   box.innerHTML = `<div class="sheet">
     ${links.map(([h, i, t]) => `<a href="${h}">${t}<span class="pfeil">›</span></a>`).join("")}

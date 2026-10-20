@@ -611,9 +611,10 @@ details.strichliste > summary { display: flex; justify-content: space-between; a
   display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between;
   background: #fff4d6; color: #5a4300; border-bottom: 1px solid #ecd28b; padding: 8px 16px; font-size: 13px; line-height: 1.35;
 }
-.demo-knoepfe { display: flex; gap: 8px; }
+.demo-knoepfe { display: flex; gap: 6px; flex-wrap: wrap; }
+.demo-knoepfe a, .demo-knoepfe button { white-space: nowrap; }
 .demo-knoepfe button {
-  font: inherit; font-weight: 600; background: #fff; color: #5a4300; border: 1px solid #d9b85c; border-radius: 999px; padding: 4px 12px; cursor: pointer;
+  font: inherit; font-weight: 600; background: #fff; color: #5a4300; border: 1px solid #d9b85c; border-radius: 999px; padding: 4px 10px; cursor: pointer;
 }
 .demo-knoepfe button:hover { background: #ffeec2; }
 .demo-login { text-align: left; }
@@ -624,3 +625,11 @@ details.strichliste > summary { display: flex; justify-content: space-between; a
 .demo-rollen { display: grid; gap: 10px; margin-top: 12px; }
 .demo-rollen .knopf { margin-top: 0; white-space: normal; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; width: 100%; gap: 2px; }
 .demo-rollen .knopf span { font-weight: 400; font-size: 13px; opacity: .9; text-transform: none; }
+.demo-knoepfe a { font-weight: 600; color: #5a4300; align-self: center; margin-right: 4px; }
+.hinweis-demo { background: #fffaf0; border: 1px solid #ecd28b; }
+.funktion .rollen { display: flex; flex-wrap: wrap; gap: 4px; }
+.funktion .rollen span { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--blau-hell); color: var(--blau-dunkel); }
+.funktion .rollen .rolle-trainer { background: #e8f5ec; color: #1f6b3a; }
+.funktion .rollen .rolle-kasse { background: #fff4d6; color: #5a4300; }
+.funktion .karte-kopf { flex-wrap: wrap; gap: 6px; }
+.funktion .probier { margin: 10px 0 0; padding: 8px 12px; background: var(--blau-hell); border-radius: 8px; font-size: 14px; }

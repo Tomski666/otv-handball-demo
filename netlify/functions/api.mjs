@@ -10,7 +10,7 @@ import { DEMO_PERSONEN, demoDaten, heuteBerlin } from "../shared/demo.js";
 const env = (k) => (globalThis.Netlify?.env?.get(k) ?? process.env[k]);
 const daten = () => getStore({ name: "daten", consistency: "strong" });
 const fotos = () => getStore({ name: "fotos", consistency: "strong" });
-const istDemo = () => env("DEMO_MODUS") === "1";
+const istDemo = () => ["1", "true", "ja", "on"].includes(String(env("DEMO_MODUS") || "").trim().toLowerCase());
 
 // ---------- Demo ----------
 // Demo-Seite: erfundene Daten, die jeden Tag (oder auf Knopfdruck) frisch angelegt werden.
