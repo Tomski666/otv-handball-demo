@@ -62,12 +62,17 @@ function meldung(text, istFehler = false) {
 
 async function laden() {
   Z = await api("GET", "/api/zustand");
+  // Der Spieler-Zugang bekommt nur einen Teil der Daten: fehlende Listen leer setzen
+  for (const k of ["spiele", "kader", "trainer", "standdienst", "catering", "trikots", "fahrten", "mitfahrer", "fahrtbedarf", "vorrat", "waesche", "zeitnehmer", "waschdienst",
+    "hinweise", "abfragen", "abfrageAntworten", "termine", "antworten", "kasse", "anwesenheit", "trainingsausfall"]) if (!Array.isArray(Z[k])) Z[k] = [];
   document.body.classList.toggle("rolle-kasse", Z.rolle === "kasse");
+  document.body.classList.toggle("rolle-trainer", Z.rolle === "trainer" || Z.rolle === "kasse");
+  document.body.classList.toggle("rolle-spieler", nurSpielerSicht());
   if (Z.demo) demoLeiste();
 }
 
 // ---------- Demo ----------
-const ROLLEN_NAME = { eltern: "Elternteil", trainer: "Trainer", kasse: "Kasse" };
+const ROLLEN_NAME = { spieler: "Spieler", eltern: "Elternteil", trainer: "Trainer", kasse: "Kasse" };
 function demoLeiste() {
   let l = $("#demo-leiste");
   if (!l) {
@@ -86,8 +91,8 @@ function demoLeiste() {
       }
     });
   }
-  l.innerHTML = `<span><strong>Demo</strong> mit erfundenen Daten · Du siehst die Seite als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)})</span>
-    <span class="demo-knoepfe"><a href="#/funktionen">Funktionen</a><button type="button" data-demo="wechseln">Rolle wechseln</button><button type="button" data-demo="zuruecksetzen">Zurücksetzen</button></span>`;
+  l.innerHTML = `<span><strong>Demo ${esc(Z.einstellungen.mannschaftName || "")}</strong> mit erfundenen Daten · Du siehst die Seite als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)})</span>
+    <span class="demo-knoepfe"><a href="#/funktionen">Funktionen</a><button type="button" data-demo="wechseln">Rolle oder Mannschaft wechseln</button><button type="button" data-demo="zuruecksetzen">Zurücksetzen</button></span>`;
 }
 // Funktionsübersicht (nur in der Demo)
 function seiteFunktionen() {
@@ -102,8 +107,29 @@ function seiteFunktionen() {
   <section class="karte hinweis-demo">
     <p>Eine Seite für Eltern, Trainer und Kassenwart einer Jugendmannschaft. Sie ersetzt Listen in der WhatsApp-Gruppe, Zettel am Kuchenstand und das Kassenbuch auf Papier. Keine App aus dem Store, keine Benutzerkonten: ein Passwort pro Rolle, eingetragen wird nur der Vorname.</p>
     <p><strong>Zur Demo:</strong> Alle Namen, Spiele und Beträge sind erfunden. Du kannst alles ausprobieren, eintragen und löschen. Die Daten werden <strong>jeden Tag neu angelegt</strong> und lassen sich oben über „Zurücksetzen“ sofort wiederherstellen. Über „Rolle wechseln“ siehst du die Seite als Elternteil, Trainer oder Kasse.</p>
-    <p class="leise klein">Du bist gerade angemeldet als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)}).</p>
+    <p class="leise klein">Du bist gerade angemeldet als <strong>${ROLLEN_NAME[Z.rolle]}</strong> (${esc(Z.demo.person.text)}) bei der Demo-Mannschaft <strong>${esc(Z.einstellungen.mannschaftName || "")}</strong>. Über „Rolle oder Mannschaft wechseln“ kommst du zur zweiten Demo-Mannschaft.</p>
   </section>
+  <h2 class="bereich-titel">Für jede Mannschaft passend</h2>
+  ${block("Jugend und Erwachsene", r("kasse"), [
+    "<strong>Jugend:</strong> Eltern organisieren Standdienst, Kuchen und Fahrten. Die Jungs melden sich mit eigenem Zugang für Training und Spiele.",
+    "<strong>Erwachsene:</strong> Es gibt keinen Eltern-Zugang. Die Spieler übernehmen selbst Dienste, Fahrten, Zu- und Absagen. Alle Texte sprechen sie direkt an.",
+    "Umschalten in der Verwaltung, die Daten bleiben dabei erhalten.",
+  ], "Beide Demo-Mannschaften ansehen: C-Jugend und 1. Herren.")}
+  ${block("Module ein- und ausschalten", r("kasse"), [
+    "Jede Mannschaft schaltet nur ein, was sie braucht: Standdienst, Strichliste, Helferdienste, Zeitnehmer, Wäsche, Trikots, Fahrten, An- und Abmeldung, Infos, Termine, Abfragen, Kasse, Galerie, Erinnerungen.",
+    "Was aus ist, verschwindet überall: Menü, Startseite, Spielkarten, WhatsApp-Texte und Erinnerungen. So bleibt die Seite übersichtlich.",
+  ], "Als Kasse unter Mehr › Verwaltung › Einstellungen › Module einen Bereich ausschalten und die Startseite ansehen.")}
+  ${block("Helferdienste mit Fairness", r("spieler", "eltern", "trainer", "kasse"), [
+    "Frei anlegbare Dienste pro Heimspiel, zum Beispiel Hallenaufbau, Tribüne, Werbebanner, Getränkestand und Abbau, jeweils mit Anzahl Personen und Uhrzeit.",
+    "Eine Übersicht für alle zeigt, wer wie oft dran war. So hängt es nicht immer an denselben.",
+    "Sind Dienste kurz vor dem Spiel noch offen, schlägt die Seite die vor, die bisher am seltensten dran waren, und erinnert sie per Push.",
+    "Trainer und Kasse können Spieler direkt eintragen.",
+  ], "Bei den 1. Herren als Spieler (Marco) das nächste Heimspiel öffnen: Marco steht im Vorschlag, weil er noch nie dran war.")}
+  ${block("Mannschaftsabende und Touren", r("spieler", "eltern", "trainer", "kasse"), [
+    "Termine mit Zu- und Absage, Begleitpersonen und Kosten, auch über mehrere Tage.",
+    "Für die Mannschaftstour: Kosten pro Person, Anzahlung mit Frist, Liste wer angezahlt und wer bezahlt hat. Die Kasse bucht Anzahlung und Restzahlung mit einem Klick.",
+    "Vorab eine Abfrage: Wie viele Tage kannst du? Wohin soll es gehen?",
+  ], "Bei den 1. Herren unter Infos & Termine die Mannschaftstour und die Abfragen ansehen.")}
   <h2 class="bereich-titel">Für alle Eltern</h2>
   ${block("Start: Deine Aufgaben", r("eltern", "trainer", "kasse"), [
     "Oben steht, was du zugesagt hast: Standdienst, Kuchen, Fahrt, Zeitnehmer, Wäsche, Trikots, Termine.",
@@ -116,8 +142,21 @@ function seiteFunktionen() {
     "Standdienst mit Reserveplatz. Sagt jemand ab, rückt die Reserve automatisch nach.",
     "Treffzeit in der Halle wird aus der Anwurfzeit berechnet, die Halle ist mit Route verlinkt.",
     "Austragen geht auf dem eigenen Handy jederzeit, ohne jemanden fragen zu müssen.",
+    "Fahrten: Hin- und Rückfahrt getrennt anbieten, Kinder in ein anderes Auto umsteigen lassen, „Wir suchen noch eine Fahrt“ melden. Fahrer nehmen gesuchte Kinder mit einem Klick mit.",
     "Kalender-Abo: alle Spiele und Termine automatisch im Handykalender, Änderungen kommen von selbst nach.",
   ], "Beim nächsten Heimspiel „Ich mache das“ beim Zeitnehmer drücken oder bei der Fahrt „Ben fährt mit“.")}
+  ${block("Training und Spiele: an- und abmelden", r("spieler", "eltern", "trainer", "kasse"), [
+    "Die Jungs haben einen eigenen Zugang und melden sich selbst für Training und Spiele an oder ab, mit kurzem Hinweis.",
+    "Beim Training gilt wahlweise: dabei, wer sich nicht abmeldet. Bei Spielen sagen alle zu oder ab.",
+    "Eltern sehen, wie sich ihr Sohn gemeldet hat, melden aber nicht selbst. Der Spieler-Zugang sieht keine Kasse und keine Einträge der Eltern.",
+    "Das Trainerteam sieht pro Termin, wer kommt, wer fehlt und wer sich noch nicht gemeldet hat, und kann Trainings absagen, auch für ganze Ferien.",
+  ], "Über „Rolle wechseln“ als Spieler anmelden: Ben muss für das nächste Heimspiel noch zusagen.")}
+  ${block("Erinnerungen aufs Handy", r("spieler", "eltern", "trainer", "kasse"), [
+    "Push-Nachrichten ohne App-Store: Am Vortag erinnert die Seite an Standdienst, Kuchen, Fahrt und Zeitnehmer.",
+    "Zwei Tage vor dem Spiel: was noch fehlt. Die Jungs werden erinnert, wenn sie sich noch nicht gemeldet haben.",
+    "Fällt ein Training aus oder schreibt das Trainerteam eine wichtige Info, geht sofort eine Nachricht raus.",
+    "In der Demo kannst du über Mehr › Benachrichtigungen eine Testnachricht an dein Handy schicken.",
+  ])}
   ${block("Infos & Termine", r("eltern", "trainer", "kasse"), [
     "Infos vom Trainerteam mit Ablaufdatum, alte Infos verschwinden von selbst.",
     "Abfragen mit Mehrfachauswahl (z. B. Ferientraining) oder Ja/Nein (z. B. Turnier), mit Frist und Übersicht, wer schon geantwortet hat.",
@@ -160,7 +199,7 @@ function seiteFunktionen() {
   ${block("Sparsam mit Daten", r("eltern", "trainer", "kasse"), [
     "Nur Vornamen, keine Nachnamen, keine Telefonnummern, keine Adressen.",
     "Keine Benutzerkonten, keine Werbung, kein Tracking. Suchmaschinen sind ausgeschlossen.",
-    "Drei Passwörter: Eltern, Trainer, Kasse. Jede Rolle sieht und darf nur, was sie braucht.",
+    "Vier Zugänge: Spieler, Eltern, Trainer, Kasse. Jede Rolle sieht und darf nur, was sie braucht.",
     "Läuft im Browser auf jedem Handy, ohne Installation aus einem App-Store.",
   ])}`;
 }
@@ -170,7 +209,7 @@ function demoPerson() {
   const p = Z.demo.person;
   lokal("otv_vorname", p.vorname);
   lokal("otv_kind", p.kind);
-  lokal("otv_name", p.kind ? `${p.vorname} (${p.kind})` : Z.rolle === "trainer" ? `${p.vorname} (Trainer)` : p.vorname);
+  lokal("otv_name", Z.rolle === "spieler" || (erwachsen() && p.kind) ? p.kind : p.kind ? `${p.vorname} (${p.kind})` : Z.rolle === "trainer" ? `${p.vorname} (Trainer)` : p.vorname);
   lokal("otv_willkommen", "1");
   lokal("otv_rolle", Z.rolle);
 }
@@ -181,8 +220,30 @@ const heimspiele = () => spieleSortiert().filter((s) => s.heim);
 const kommende = (liste) => liste.filter((s) => s.datum >= heute());
 const vergangene = (liste) => liste.filter((s) => s.datum < heute());
 const kader = () => [...Z.kader].sort((a, b) => (a.reihenfolge - b.reihenfolge) || a.vorname.localeCompare(b.vorname, "de"));
-const familien = () => kader().map((k) => "Familie von " + k.vorname);
+const familien = () => kader().map((k) => wirIhr().Familie + k.vorname);
 const istAdmin = () => Z.rolle === "kasse";
+// Ab 2.0: Mannschaftstyp und Module
+const erwachsen = () => Z.einstellungen.mannschaftstyp === "erwachsene";
+const nurSpielerSicht = () => Z.rolle === "spieler" && !erwachsen(); // Jugend: eingeschränkte Ansicht für die Jungs
+const modul = (k) => (k === "dienste" ? (Z.einstellungen.module || {}).dienste === true : (Z.einstellungen.module || {})[k] !== false);
+const MODULE = [
+  ["standdienst", "Standdienst und Mitbringliste", "Heimspiel-Catering mit Reserve, Kuchen und Vorrat"],
+  ["strichliste", "Getränke-Strichliste", "Zählen am Stand, Vereinsanteil in der Abrechnung"],
+  ["dienste", "Helferdienste", "z. B. Hallenaufbau, Tribüne, Werbebanner, mit Fairness-Vorschlag"],
+  ["zeitnehmer", "Zeitnehmer", ""],
+  ["waesche", "Wäsche nach dem Heimspiel", ""],
+  ["trikots", "Trikots waschen (reihum)", ""],
+  ["fahrten", "Fahrgemeinschaften", ""],
+  ["anwesenheit", "Training und Spiele: An- und Abmeldung", ""],
+  ["infos", "Infos vom Trainerteam", ""],
+  ["termine", "Termine, Mannschaftsabende, Touren", ""],
+  ["abfragen", "Abfragen", ""],
+  ["kasse", "Mannschaftskasse", ""],
+  ["galerie", "Fotogalerie", ""],
+  ["push", "Erinnerungen aufs Handy", ""],
+];
+// Wer bin ich in der Mannschaft? Jugend: der Sohn (Familie), Erwachsene: man selbst
+const wirIhr = () => (erwachsen() ? { wir: "ich", ihr: "du", euch: "dich", seid: "bist", Familie: "" } : { wir: "wir", ihr: "ihr", euch: "euch", seid: "seid", Familie: "Familie von " });
 const istTrainer = () => Z.rolle === "trainer" || Z.rolle === "kasse";
 const darfLoeschen = (e) => istAdmin() || e.eigen;
 
@@ -257,7 +318,8 @@ const halleAdresse = (name) => halleZu(name)?.adresse || "";
 
 function hallenZeile(s) {
   const t = treffzeit(s);
-  return `<p class="info-zeile">${t ? `Die Jungs müssen spätestens um <strong>${t} Uhr</strong> in der Halle sein` : `Die Jungs müssen ${Z.einstellungen.standdienstVorlauf ?? 60} Minuten vor Anwurf in der Halle sein`} (${Z.einstellungen.standdienstVorlauf ?? 60} Minuten vor Anwurf). Abfahrt bitte entsprechend früher planen.</p>`;
+  const wer = erwachsen() ? "Treffen" : "Die Jungs müssen";
+  return `<p class="info-zeile">${t ? `${wer} spätestens um <strong>${t} Uhr</strong> in der Halle${erwachsen() ? "" : " sein"}` : `${wer} ${Z.einstellungen.standdienstVorlauf ?? 60} Minuten vor Anwurf in der Halle${erwachsen() ? "" : " sein"}`} (${Z.einstellungen.standdienstVorlauf ?? 60} Minuten vor Anwurf). Abfahrt bitte entsprechend früher planen.</p>`;
 }
 const AUSTRAGEN_HINWEIS = "Austragen geht nur auf dem Handy, mit dem du dich eingetragen hast. Sonst kurz in die WhatsApp-Gruppe schreiben.";
 const kopfzeile = (unter, titel) => `<p class="unterzeile">${unter}</p><h1>${titel}</h1>`;
@@ -277,31 +339,38 @@ const SEITEN = {
   verwaltung: seiteVerwaltung,
   datenschutz: seiteDatenschutz,
   funktionen: seiteFunktionen,
+  anwesenheit: seiteAnwesenheit,
 };
+const SPIELER_SEITEN = { "": seiteSpielerStart, mannschaft: seiteMannschaft, datenschutz: seiteDatenschutz, funktionen: seiteFunktionen };
 
 function meineTermine() {
   const t = [];
   const spiel = (id) => Z.spiele.find((x) => x.id === id);
   const kommt = (sp) => sp && sp.datum >= heute();
-  for (const d of Z.standdienst.filter((x) => x.eigen)) {
+  for (const d of Z.standdienst.filter((x) => x.eigen && modul("standdienst"))) {
     const sp = spiel(d.spielId);
     if (kommt(sp)) t.push({ key: "s" + d.id, spiel: sp, text: d.reserve ? "Du bist Reserve beim Standdienst" : `Du hast Standdienst${d.nachgerueckt ? " (nachgerückt)" : ""}${treffzeit(sp) ? `, ab ${treffzeit(sp)} Uhr` : ""}`, standdienst: true, link: "#/catering" });
   }
-  for (const c of Z.catering.filter((x) => x.eigen)) {
+  for (const c of Z.catering.filter((x) => x.eigen && modul("standdienst"))) {
     const sp = spiel(c.spielId);
     if (kommt(sp)) t.push({ key: "c" + c.id, spiel: sp, text: `Du bringst ${c.artikel} mit${c.menge ? ` (${c.menge})` : ""}`, link: "#/catering" });
   }
-  for (const f of Z.fahrten.filter((x) => x.eigen)) {
+  for (const x of (Z.dienste || []).filter((x) => x.eigen && modul("dienste"))) {
+    const sp = spiel(x.spielId);
+    const art = dienstArten().find((a) => a.name === x.dienst);
+    if (kommt(sp)) t.push({ key: "d" + x.id, spiel: sp, text: `Du hast ${x.dienst}${art ? dienstZeitText(sp, art, true) : ""}`, standdienst: true, link: "#/spiele" });
+  }
+  for (const f of Z.fahrten.filter((x) => x.eigen && modul("fahrten"))) {
     const sp = spiel(f.spielId);
     const mit = Z.mitfahrer.filter((m) => m.fahrtId === f.id).map((m) => m.name);
     if (kommt(sp)) t.push({ key: "f" + f.id, spiel: sp, text: `Du fährst${mit.length ? ": " + mit.join(", ") : ""}${f.treffpunkt ? " · " + f.treffpunkt : ""}${treffzeit(sp) ? ` · in der Halle um ${treffzeit(sp)}` : ""}`, standdienst: true, link: "#/fahrten" });
   }
-  for (const m of Z.mitfahrer.filter((x) => x.eigen)) {
+  for (const m of Z.mitfahrer.filter((x) => x.eigen && modul("fahrten"))) {
     const f = Z.fahrten.find((x) => x.id === m.fahrtId);
     const sp = f && spiel(f.spielId);
-    if (kommt(sp)) t.push({ key: "m" + m.id, spiel: sp, text: `${m.name} fährt mit bei ${anzeigeName(f.fahrer)}${f.treffpunkt ? " · " + f.treffpunkt : ""}`, standdienst: true, link: "#/fahrten" });
+    if (kommt(sp)) t.push({ key: "m" + m.id, spiel: sp, text: `${erwachsen() && m.name === meinKind() ? "Du fährst" : m.name + " fährt"} mit bei ${anzeigeName(f.fahrer)}${f.treffpunkt ? " · " + f.treffpunkt : ""}`, standdienst: true, link: "#/fahrten" });
   }
-  for (const w of (Z.waschdienst || []).filter((x) => x.eigen)) {
+  for (const w of (Z.waschdienst || []).filter((x) => x.eigen && modul("waesche"))) {
     const sp = spiel(w.spielId);
     if (!sp) continue;
     if (kommt(sp)) t.push({ key: "w" + w.id, spiel: sp, text: `Du nimmst nach dem Spiel ${waescheText()} mit`, standdienst: true, link: "#/catering" });
@@ -310,19 +379,19 @@ function meineTermine() {
       if (naechstes) t.push({ key: "wz" + w.id, spiel: naechstes, text: `Bitte ${waescheText()} gewaschen mitbringen`, standdienst: true, link: "#/catering" });
     }
   }
-  for (const z of (Z.zeitnehmer || []).filter((x) => x.eigen)) {
+  for (const z of (Z.zeitnehmer || []).filter((x) => x.eigen && modul("zeitnehmer"))) {
     const sp = spiel(z.spielId);
     if (kommt(sp)) t.push({ key: "z" + z.id, spiel: sp, text: "Du bist Zeitnehmer", standdienst: true, link: "#/spiele" });
   }
-  if (meinKind()) {
+  if (meinKind() && modul("termine")) {
     for (const a of (Z.antworten || []).filter((x) => x.familie === meinKind() && x.kommt)) {
       const tm = (Z.termine || []).find((x) => x.id === a.terminId);
       if (tm && tm.datum >= heute()) t.push({ key: "a" + a.id, spiel: { datum: tm.datum, zeit: tm.zeit, titel: tm.titel, ort: tm.ort }, text: `${tm.titel}${a.personen ? ` (+${a.personen})` : ""}`, link: "#/infos" });
     }
   }
-  if (meinKind()) {
-    for (const p of trikotPlan().filter((p) => !p.erledigt && p.spiel.datum >= heute() && p.familie === "Familie von " + meinKind())) {
-      t.push({ key: "t" + p.spiel.id, spiel: p.spiel, text: "Ihr nehmt die Trikots zum Waschen mit", link: "#/trikots" });
+  if (meinKind() && modul("trikots")) {
+    for (const p of trikotPlan().filter((p) => !p.erledigt && p.spiel.datum >= heute() && p.familie === wirIhr().Familie + meinKind())) {
+      t.push({ key: "t" + p.spiel.id, spiel: p.spiel, text: erwachsen() ? "Du nimmst die Trikots zum Waschen mit" : "Ihr nehmt die Trikots zum Waschen mit", link: "#/trikots" });
     }
   }
   return t.sort((a, b) => (a.spiel.datum + a.spiel.zeit).localeCompare(b.spiel.datum + b.spiel.zeit));
@@ -458,7 +527,7 @@ function heimAufgaben(s) {
 function auswAufgaben(s) {
   const st = fahrtStatus(s);
   const kind = meinKind();
-  const kindDabei = kind && Z.mitfahrer.some((m) => m.name === kind && st.fahrten.some((f) => f.id === m.fahrtId));
+  const bedarf = bedarfVon(s);
   const ichFahre = st.fahrten.some((f) => f.eigen);
   const v = Z.einstellungen.standdienstVorlauf ?? 60;
   const z = [{
@@ -467,6 +536,7 @@ function auswAufgaben(s) {
     detail: `${s.halle ? esc(s.halle) + (halleAdresse(s.halle) && !s.halle.includes(halleAdresse(s.halle)) ? ", " + esc(halleAdresse(s.halle)) : "") : "Halle folgt"}`,
     knopf: routeLink(s.halle),
   }];
+  if (!modul("fahrten")) return z;
   if (!st.fahrten.length) {
     z.push({ status: "offen", titel: "Fahrgemeinschaft", kurz: "Fahrer", stand: "noch kein Fahrer",
       knopf: `<button class="knopf klein" data-aktion="fahrt-anbieten" data-id="${s.id}">Ich fahre</button>` });
@@ -476,11 +546,16 @@ function auswAufgaben(s) {
     const frei = f.plaetze - mit.length;
     z.push({
       status: frei > 0 ? "ok" : "info",
-      titel: `${esc(anzeigeName(f.fahrer))} fährt${f.eigen ? " · du" : ""}`,
+      titel: `${esc(anzeigeName(f.fahrer))} fährt${richtungText(f) ? ` (${richtungText(f)})` : ""}${f.eigen ? " · du" : ""}`,
       stand: frei > 0 ? `${frei} frei` : "voll",
       detail: [f.treffpunkt ? "Abfahrt " + esc(abfahrtText(f.treffpunkt)) : "", mit.length ? "dabei: " + esc(mit.join(", ")) : "noch niemand dabei"].filter(Boolean).join(" · "),
-      knopf: frei > 0 && kind && !kindDabei ? `<button class="knopf klein" data-aktion="mitfahren-schnell" data-fahrt="${f.id}">${esc(kind)} fährt mit</button>` : "",
+      knopf: frei > 0 && kind && !fahrtKonflikt(kind, f) && !(erwachsen() && f.eigen) ? `<button class="knopf klein" data-aktion="mitfahren-schnell" data-fahrt="${f.id}">${erwachsen() ? "Ich fahre mit" : esc(kind) + " fährt mit"}</button>` : "",
     });
+  }
+  if (bedarf.length) {
+    z.push({ status: "offen", titel: "Fahrt gesucht", kurz: "Fahrt gesucht", stand: `${bedarf.length} Spieler`,
+      detail: esc(bedarf.map(bedarfText).join(", ")),
+      knopf: `<button class="knopf klein zweit" data-aktion="mehr-oeffnen" data-id="${s.id}">Ansehen</button>` });
   }
   if (st.fahrten.length && !ichFahre) {
     z.push({ status: "info", titel: "Weitere Fahrer willkommen",
@@ -489,13 +564,13 @@ function auswAufgaben(s) {
   return z;
 }
 function spielKarte(s, { start = false, schonGezeigt = [] } = {}) {
-  const zeilen = [...(s.heim ? heimAufgaben(s) : auswAufgaben(s)), zeitnehmerAufgabe(s), s.heim ? waescheAufgabe(s) : null, trikotAufgabe(s)].filter(Boolean);
+  const zeilen = [...(s.heim ? (modul("standdienst") ? heimAufgaben(s) : []) : auswAufgaben(s)), ...dienstAufgaben(s), zeitnehmerAufgabe(s), s.heim ? waescheAufgabe(s) : null, trikotAufgabe(s)].filter(Boolean);
   const offen = zeilen.filter((z) => z.status === "offen" || z.status === "dringend");
   const status = offen.length
     ? `<span class="pill ${offen.some((z) => z.status === "dringend") ? "dringend" : "offen"}">${offen.length <= 3 ? "Offen: " + offen.map((z) => z.kurz || z.titel).join(", ") : `${offen.length} Aufgaben offen`}</span>`
-    : `<span class="pill ok">✓ Alles besetzt</span>`;
+    : zeilen.some((z) => z.status === "ok") ? `<span class="pill ok">✓ Alles besetzt</span>` : "";
   const st = s.heim ? cateringStatus(s) : null;
-  const auswahl = s.heim && st.offen.length ? `<div class="mitbringen-auswahl" id="mb-${s.id}" hidden>
+  const auswahl = s.heim && modul("standdienst") && st.offen.length ? `<div class="mitbringen-auswahl" id="mb-${s.id}" hidden>
       <p class="leise klein" style="margin:4px 0 6px">Was bringst du mit? Einmal antippen genügt.</p>
       <div class="hero-knoepfe">${st.offen.map((a) => `<button class="knopf zweit gross" data-aktion="bringe-schnell" data-spiel="${s.id}" data-artikel="${esc(a.name)}">${esc(a.name)}${a.hinweis ? `<small>je ${esc(a.hinweis)}</small>` : ""}</button>`).join("")}</div></div>` : "";
   const offenGesetzt = start || (offeneSpiele && offeneSpiele.has(s.id));
@@ -505,9 +580,9 @@ function spielKarte(s, { start = false, schonGezeigt = [] } = {}) {
     <div class="spielkarte-inhalt">
       <ul class="aufgaben">${zeilen.map(aufgabe).join("")}</ul>
       ${auswahl}
-      ${strichSichtbar(s) ? strichKarte(s, start && s.datum === heute()) : ""}
-      <details class="mehr-details" id="mehr-${s.id}"><summary>${s.heim ? "Standdienst, Reserve und Mitbringliste im Detail" : "Fahrten im Detail: mitfahren, Plätze anbieten"}</summary>
-        <div class="abstand">${s.heim ? cateringDetails(s) : fahrtenDetails(s)}</div></details>
+      ${modul("strichliste") && strichSichtbar(s) ? strichKarte(s, start && s.datum === heute()) : ""}
+      ${(s.heim ? modul("standdienst") : modul("fahrten")) ? `<details class="mehr-details" id="mehr-${s.id}" ${offeneMehr.has(s.id) ? "open" : ""}><summary>${s.heim ? "Standdienst, Reserve und Mitbringliste im Detail" : erwachsen() ? "Fahrten im Detail: mitfahren, Plätze anbieten, Fahrt suchen" : "Fahrten im Detail: mitfahren, Plätze anbieten"}</summary>
+        <div class="abstand">${s.heim ? cateringDetails(s) : fahrtenDetails(s)}</div></details>` : ""}
       ${istTrainer() || istAdmin() ? `<div class="spielkarte-fuss">
         ${istTrainer() ? `<button class="knopf klein zweit" data-aktion="whatsapp-spiel" data-spiel="${s.id}">Für WhatsApp kopieren</button>` : "<span></span>"}
         ${istAdmin() ? `<span class="ausrichten"><button class="link-knopf" data-aktion="spiel-bearbeiten" data-id="${s.id}">Spiel bearbeiten</button>
@@ -540,16 +615,18 @@ function seiteStart() {
     ${termine.length > 4 ? `<details><summary class="klein">Alle anzeigen (${termine.length})</summary><ul class="liste">${termine.slice(4).map(aufgabeLi).join("")}</ul></details>` : ""}
   </section>` : "";
 
-  const terminHinweis = offeneRueckmeldungen().filter((x) => !x.meins).map((x) => `<a class="termin-hinweis ${fristBald(x.frist) ? "dringend" : ""}" href="#/infos"><span><strong>${esc(x.titel)}</strong>${x.datum ? ` am ${kurzDatum(x.datum)}` : ""}: bitte ${meinKind() ? `für ${esc(meinKind())} ` : ""}${x.art === "termin" ? "zurückmelden" : "antworten"}${x.frist && x.frist >= heute() ? ` <span class="frist-text">bis ${wochentagKurz(x.frist)} ${kurzDatum(x.frist)}</span>` : ""}</span> ›</a>`).join("");
+  const terminHinweis = offeneRueckmeldungen().filter((x) => !x.meins).map((x) => `<a class="termin-hinweis ${fristBald(x.frist) ? "dringend" : ""}" href="#/infos"><span><strong>${esc(x.titel)}</strong>${x.datum ? ` am ${kurzDatum(x.datum)}` : ""}: bitte ${meinKind() && !erwachsen() ? `für ${esc(meinKind())} ` : ""}${x.art === "termin" ? "zurückmelden" : "antworten"}${x.frist && x.frist >= heute() ? ` <span class="frist-text">bis ${wochentagKurz(x.frist)} ${kurzDatum(x.frist)}</span>` : ""}</span> ›</a>`).join("");
 
-  const infos = aktiveHinweise().length ? `<section class="karte infos-start"><div class="karte-kopf"><h2 style="margin:0">Vom Trainerteam</h2><a class="klein" href="#/infos">alle ›</a></div>${hinweiseKarte(true)}</section>` : "";
+  const infos = modul("infos") && aktiveHinweise().length ? `<section class="karte infos-start"><div class="karte-kopf"><h2 style="margin:0">Vom Trainerteam</h2><a class="klein" href="#/infos">alle ›</a></div>${hinweiseKarte(true)}</section>` : "";
   return `<p class="unterzeile">${meinVorname() ? "Hallo " + esc(meinVorname()) : "Willkommen"}</p><h1>Die nächsten Spiele</h1>
   ${installKarte()}
-  ${!meinKind() && Z.rolle !== "trainer" ? `<section class="karte sohn-fehlt"><div><strong>Wer ist dein Sohn?</strong>
-      <div class="leise klein">Einmal auswählen, dann sind deine Einträge eurer Familie zugeordnet und du kannst bei Terminen und Abfragen antworten.</div></div>
+  ${!meinKind() && Z.rolle !== "trainer" ? `<section class="karte sohn-fehlt"><div><strong>${erwachsen() ? "Wer bist du?" : "Wer ist dein Sohn?"}</strong>
+      <div class="leise klein">${erwachsen() ? "Einmal auswählen, dann zählen deine Dienste für dich und du kannst bei Terminen und Abfragen antworten." : "Einmal auswählen, dann sind deine Einträge eurer Familie zugeordnet und du kannst bei Terminen und Abfragen antworten."}</div></div>
       <button class="knopf klein" data-aktion="name-aendern">Jetzt auswählen</button></section>` : ""}
+  ${pushKarte()}
   ${infos}
   ${meine}
+  ${anwesenheitStartKarte()}
   ${terminHinweis}
   ${karten.length ? karten.map((k, i) => `<div class="${i ? "abstand" : ""}">${k}</div>`).join("") : `<section class="karte"><p class="leer">Gerade steht kein Spiel an.</p></section>`}
   ${heimHinweis}`;
@@ -592,7 +669,7 @@ let kalenderPfad = null;
 function kalenderAboKarte() {
   if (kalenderPfad === null) {
     kalenderPfad = "";
-    api("GET", "/api/kalender-link").then((r) => { kalenderPfad = r.pfad; if (location.hash.startsWith("#/spiele")) zeigen(); }).catch(() => { kalenderPfad = null; });
+    api("GET", "/api/kalender-link").then((r) => { kalenderPfad = r.pfad; if (location.hash.startsWith("#/spiele") || nurSpielerSicht()) zeigen(); }).catch(() => { kalenderPfad = null; });
   }
   const https = kalenderPfad ? location.origin + kalenderPfad : "";
   const webcal = kalenderPfad ? "webcal://" + location.host + kalenderPfad : "";
@@ -627,7 +704,7 @@ function seiteSpiele() {
   const k = kommende(liste), v = vergangene(liste);
   if (offeneSpiele === null) offeneSpiele = new Set(k.length ? [k[0].id] : []);
   const knopf = (wert, text) => `<button class="seg ${f === wert ? "an ok" : ""}" data-aktion="spiele-filter" data-wert="${wert}">${text}</button>`;
-  return `${kopfzeile("Standdienst, Mitbringen, Fahrten, Zeitnehmer", "Spiele")}
+  return `${kopfzeile([modul("standdienst") && "Standdienst, Mitbringen", modul("dienste") && "Helferdienste", modul("fahrten") && "Fahrten", modul("zeitnehmer") && "Zeitnehmer"].filter(Boolean).join(", ") || "Spielplan", "Spiele")}
   <div class="spiele-kopf">
     <div class="segment filter">${knopf("alle", "Alle")}${knopf("heim", "Heimspiele")}${knopf("aus", "Auswärts")}</div>
   </div>
@@ -635,7 +712,8 @@ function seiteSpiele() {
   ${k.length ? k.map((s) => spielKarte(s)).join("") : `<section class="karte"><p class="leer">Keine kommenden Spiele${f === "heim" ? " (Heim)" : f === "aus" ? " (Auswärts)" : ""} eingetragen.</p></section>`}
   ${v.length ? `<details class="abstand"><summary>Vergangene Spiele (${v.length})</summary><div class="abstand">${[...v].reverse().map((s) => spielKarte(s)).join("")}</div></details>` : ""}
   <h2 class="bereich-titel">Rund um die Spiele</h2>
-  ${f !== "aus" ? vorratKarte() : ""}
+  ${f !== "aus" && modul("standdienst") ? vorratKarte() : ""}
+  ${f !== "aus" && modul("dienste") ? dienstFairnessKarte() : ""}
   ${kalenderAboKarte()}
   <details class="karte formular-klappe"><summary>Spielplan und Tabelle (handball.net)</summary>
     <div class="abstand">${e.widgetToken ? `<div id="handball-spielplan"></div><div id="handball-tabelle" class="abstand"></div>` : `<p>Spielplan, Ergebnisse und Tabelle kommen direkt von handball.net.</p>`}
@@ -682,7 +760,7 @@ function vorratStand(name) {
 
 // ---------- Zeitnehmer ----------
 const zeitnehmerPlaetze = () => Z.einstellungen.zeitnehmerPlaetze ?? 1;
-const zeitnehmerNoetig = (s) => zeitnehmerPlaetze() > 0 && (Z.einstellungen.zeitnehmerBei !== "heim" || s.heim);
+const zeitnehmerNoetig = (s) => modul("zeitnehmer") && zeitnehmerPlaetze() > 0 && (Z.einstellungen.zeitnehmerBei !== "heim" || s.heim);
 const zeitnehmerVon = (s) => (Z.zeitnehmer || []).filter((x) => x.spielId === s.id);
 const zeitnehmerFehlt = (s) => zeitnehmerNoetig(s) && zeitnehmerVon(s).length < zeitnehmerPlaetze();
 function zeitnehmerAufgabe(s) {
@@ -711,7 +789,7 @@ function zeitnehmerKurz(s) {
 
 // ---------- Wäsche: wer nimmt nach dem Heimspiel Geschirrtücher und Spüllappen mit ----------
 const waescheText = () => { const w = Z.einstellungen.waescheArtikel || []; return w.length > 1 ? `${w.slice(0, -1).join(", ")} und ${w.at(-1)}` : w[0] || ""; };
-const waescheNoetig = (s) => s.heim && (Z.einstellungen.waescheArtikel || []).length > 0;
+const waescheNoetig = (s) => modul("waesche") && s.heim && (Z.einstellungen.waescheArtikel || []).length > 0;
 const waescheVon = (s) => (Z.waschdienst || []).find((x) => x.spielId === s.id);
 const waescheFehlt = (s) => waescheNoetig(s) && !waescheVon(s);
 const vorherigesHeim = (s) => heimspiele().filter((x) => x.datum < s.datum).sort((a, b) => b.datum.localeCompare(a.datum))[0];
@@ -730,6 +808,7 @@ function waescheAufgabe(s) {
 }
 const waescheZeile = (s) => { const a = waescheAufgabe(s); return a ? aufgabe(a) : ""; };
 function trikotAufgabe(s) {
+  if (!modul("trikots")) return null;
   const p = trikotPlan().find((x) => x.spiel.id === s.id);
   if (!p) return null;
   const wer = p.familie.replace(/^Familie von /, "");
@@ -737,7 +816,7 @@ function trikotAufgabe(s) {
   return {
     status: p.erledigt ? "ok" : "info",
     titel: "Trikots waschen",
-    stand: esc(wer) + (ihr ? ` <span class="pill offen">das seid ihr</span>` : ""),
+    stand: esc(wer) + (ihr ? ` <span class="pill offen">${erwachsen() ? "das bist du" : "das seid ihr"}</span>` : ""),
     detail: p.erledigt ? "erledigt, danke!" : "Satz nach dem Spiel mitnehmen, gewaschen zum nächsten Spiel",
     knopf: `<a class="link-knopf" href="#/trikots">${ihr ? "tauschen" : "Plan"}</a>`,
   };
@@ -839,11 +918,11 @@ function seiteTrikots() {
   const fam = familien();
   const naechstes = plan.find((p) => !p.erledigt && p.spiel.datum >= heute());
   const kurz = (f) => f.replace(/^Familie von /, "");
-  return `${kopfzeile("Reihum, jede Familie ist dran", "Trikots waschen")}
+  return `${kopfzeile(erwachsen() ? "Reihum, jeder ist mal dran" : "Reihum, jede Familie ist dran", "Trikots waschen")}
   ${naechstes ? `<section class="karte trikot-naechstes"><span class="kachel-label">Als Nächstes dran</span>
-    <div class="trikot-wer">${esc(kurz(naechstes.familie))}${meinKind() && kurz(naechstes.familie) === meinKind() ? ` <span class="pill offen">das seid ihr</span>` : ""}</div>
+    <div class="trikot-wer">${esc(kurz(naechstes.familie))}${meinKind() && kurz(naechstes.familie) === meinKind() ? ` <span class="pill offen">${erwachsen() ? "das bist du" : "das seid ihr"}</span>` : ""}</div>
     <div class="leise">nach dem Spiel am ${wochentagKurz(naechstes.spiel.datum)} ${kurzDatum(naechstes.spiel.datum)} ${naechstes.spiel.heim ? "gegen" : "bei"} ${esc(naechstes.spiel.gegner)}</div></section>` : ""}
-  <div class="hinweis info">Die Reihenfolge ergibt sich aus dem Kader. Nach jedem Spiel nimmt die eingetragene Familie den Trikotsatz mit, wäscht ihn und bringt ihn zum nächsten Spiel wieder mit. Wer nicht kann, tauscht einfach mit einer anderen Familie und ändert es hier.</div>
+  <div class="hinweis info">${erwachsen() ? "Die Reihenfolge ergibt sich aus dem Kader. Nach jedem Spiel nimmt der Eingetragene den Trikotsatz mit, wäscht ihn und bringt ihn zum nächsten Spiel wieder mit. Wer nicht kann, tauscht und ändert es hier." : "Die Reihenfolge ergibt sich aus dem Kader. Nach jedem Spiel nimmt die eingetragene Familie den Trikotsatz mit, wäscht ihn und bringt ihn zum nächsten Spiel wieder mit. Wer nicht kann, tauscht einfach mit einer anderen Familie und ändert es hier."}</div>
   ${fam.length < 2 ? `<div class="hinweis">Es sind erst ${fam.length} Spieler im Kader eingetragen. Die Kassenführung ergänzt den Kader unter Verwaltung, dann verteilt sich der Plan automatisch.</div>` : ""}
   <section class="karte">
     ${plan.length ? `<div class="tabelle-wrap"><table>
@@ -853,7 +932,7 @@ function seiteTrikots() {
         <td><strong>${esc(kurz(p.familie))}</strong>${p.getauscht ? ` <span class="leise klein">(getauscht)</span>` : ""}</td>
         <td><input type="checkbox" aria-label="erledigt" data-aktion="trikot-erledigt" data-id="${p.spiel.id}" ${p.erledigt ? "checked" : ""}></td>
         <td><select class="klein" data-aktion="trikot-tausch" data-id="${p.spiel.id}" aria-label="Familie ändern" style="padding:5px 8px;font-size:13px;width:auto">
-          <option value="">${p.getauscht ? "Ursprüngliche Familie" : "Familie ändern …"}</option>
+          <option value="">${p.getauscht ? (erwachsen() ? "wie im Plan" : "Ursprüngliche Familie") : (erwachsen() ? "tauschen mit …" : "Familie ändern …")}</option>
           ${fam.filter((f) => f !== p.familie).map((f) => `<option value="${esc(f)}">${esc(kurz(f))}</option>`).join("")}</select></td>
       </tr>`).join("")}</tbody></table></div>`
       : `<p class="leer">Noch keine Spiele eingetragen.</p>`}
@@ -880,6 +959,7 @@ function kasseEinfach() {
 }
 
 function seiteKasse() {
+  if (!modul("kasse")) return `${kopfzeile("", "Kasse")}<p class="leer">Die Mannschaftskasse ist ausgeschaltet.</p>`;
   if (!istAdmin() && !kassenDetails) return kasseEinfach();
   const e = Z.einstellungen;
   const { ein, aus, saldo } = kassenSummen();
@@ -914,7 +994,7 @@ function seiteKasse() {
     <section class="karte"><h2>Ausgaben nach Zweck</h2>${balken(gruppe("ausgabe", "kategorie"), aus, "var(--rot)")}</section>
   </div>
 
-  ${otvOffenKarte()}
+  ${modul("strichliste") ? otvOffenKarte() : ""}
   ${spielErgebnisse()}
   ${abrechnungsFormular()}
   <details class="karte abstand nur-kasse formular-klappe" id="buchung-klappe"><summary id="buchung-titel">Einzelne Buchung erfassen</summary>
@@ -1023,6 +1103,23 @@ function seiteVerwaltung() {
     </form></section></div>`;
   const gruppe = (titel, inhalt) => `<fieldset class="einst-gruppe"><legend>${titel}</legend>${inhalt}</fieldset>`;
   const einstellungen = `<form data-form="einstellungen">
+    ${gruppe("Mannschaft", `
+      <div class="ausrichten">
+        <div class="feld" style="flex-basis:220px"><label>Name der Mannschaft</label><input type="text" name="mannschaftName" maxlength="60" value="${esc(e.mannschaftName || "")}"></div>
+        <div class="feld" style="flex-basis:220px"><label>Verein</label><input type="text" name="vereinName" maxlength="60" value="${esc(e.vereinName || "")}"></div>
+        <div class="feld" style="flex-basis:260px"><label>Art der Mannschaft</label><select name="mannschaftstyp">
+          <option value="jugend" ${!erwachsen() ? "selected" : ""}>Jugend: Eltern organisieren, Jungs melden sich</option>
+          <option value="erwachsene" ${erwachsen() ? "selected" : ""}>Erwachsene: Spieler organisieren selbst</option></select></div>
+      </div>
+      <p class="leise klein">Bei Erwachsenen gibt es keinen Eltern-Zugang. Die Spieler melden sich mit dem Spieler-Passwort an und können alles, was sonst Eltern können.</p>`)}
+    ${gruppe("Module: was soll die Seite zeigen?", `
+      <p class="leise klein">Ausgeschaltete Bereiche verschwinden aus Menü, Startseite, Spielkarten, WhatsApp-Texten und Erinnerungen. Die Daten bleiben erhalten.</p>
+      <div class="modul-liste">${MODULE.map(([k, name, info]) => `<label class="schalter modul"><input type="checkbox" name="mod:${k}" ${modul(k) ? "checked" : ""}> <span><strong>${esc(name)}</strong>${info ? `<span class="leise klein"> · ${esc(info)}</span>` : ""}</span></label>`).join("")}</div>`)}
+    ${gruppe("Helferdienste", `
+      <label>Dienste bei Heimspielen (je Zeile: Name | Personen | Minuten vor Anwurf oder „danach“)</label>
+      <textarea name="dienstArten" style="min-height:110px" placeholder="Hallenaufbau | 4 | 90&#10;Werbebanner aufhängen | 2 | 75&#10;Abbau | 4 | danach">${esc((e.dienstArten || []).map((d) => `${d.name} | ${d.personen} | ${d.vorlauf < 0 ? "danach" : d.vorlauf}`).join("\n"))}</textarea>
+      <div class="feld abstand" style="max-width:320px"><label>Vorschlag für offene Dienste (Tage vor dem Spiel)</label><input type="number" min="0" max="14" name="dienstVorschlagTage" value="${e.dienstVorschlagTage ?? 3}"></div>
+      <p class="leise klein">Ab diesem Zeitpunkt zeigt die Seite bei offenen Diensten, wer bisher am seltensten dran war. Diese Spieler bekommen auch eine Erinnerung aufs Handy.</p>`)}
     ${gruppe("Mannschaft und Training", `
       <label>Liga</label><input type="text" name="liga" value="${esc(e.liga)}">
       <label class="abstand">Text zur Mannschaft</label><textarea name="teamText">${esc(e.teamText)}</textarea>
@@ -1030,6 +1127,13 @@ function seiteVerwaltung() {
       <textarea name="hallen" style="min-height:90px" placeholder="Humboldt | Humboldtstraße 1, 42651 Solingen">${esc((e.hallen || []).map((h) => `${h.name} | ${h.adresse}`).join("\n"))}</textarea>
       <label class="abstand">Trainingszeiten (je Zeile: Tag | Uhrzeit | Halle). Hallenname wie oben, dann erscheint die Route.</label>
       <textarea name="trainingszeiten" style="min-height:70px">${esc(e.trainingszeiten.map((t) => `${t.tag} | ${t.zeit} | ${t.halle}`).join("\n"))}</textarea>`)}
+    ${gruppe("Training: An- und Abmeldung", `
+      <div class="ausrichten">
+        <div class="feld" style="flex-basis:260px"><label>Beim Training gilt</label><select name="anwesenheitTraining"><option value="abmelden" ${e.anwesenheitTraining !== "zusagen" ? "selected" : ""}>dabei, wer sich nicht abmeldet</option><option value="zusagen" ${e.anwesenheitTraining === "zusagen" ? "selected" : ""}>jeder muss zusagen</option></select></div>
+        <div class="feld" style="flex-basis:180px"><label>Termine im Voraus (Tage)</label><input type="number" min="3" max="42" name="anwesenheitTage" value="${e.anwesenheitTage || 14}"></div>
+      </div>
+      <p class="leise klein">Bei Spielen müssen die Jungs immer zu- oder absagen. Spieler-Zugang: ${Z.spielerZugang ? "eingerichtet ✓" : "<strong>noch nicht eingerichtet</strong>. In Netlify die Umgebungsvariable SPIELER_PASSWORT anlegen und neu deployen."}</p>
+      <label class="schalter abstand"><input type="checkbox" name="pushOffeneAufgaben" ${e.pushOffeneAufgaben !== false ? "checked" : ""}> Push an alle Eltern zwei Tage vor dem Spiel, wenn Standdienst, Zeitnehmer oder Fahrer fehlen</label>`)}
     ${gruppe("Heimspiel-Catering", `
       <div class="ausrichten">
         <div class="feld"><label>Standdienst-Plätze pro Heimspiel</label><input type="number" min="1" max="10" name="standdienstPlaetze" value="${e.standdienstPlaetze}"></div>
@@ -1072,67 +1176,84 @@ function seiteVerwaltung() {
   return `${kopfzeile("Nur für die Kassenführung", "Verwaltung")}
   <p class="leise klein">Bereich antippen zum Öffnen. Alle Einstellungen speicherst du gemeinsam mit dem Knopf unten im Bereich „Einstellungen“.</p>
   ${bereich("Helfer-Übersicht", "Wer hat wie oft geholfen, Namen zuordnen", helferUebersicht())}
-  ${bereich("Einstellungen", "Mannschaft, Training, Hallen, Catering, Zeitnehmer, Kasse, Galerie", einstellungen)}
+  ${bereich("Einstellungen", "Mannschaft, Module, Helferdienste, Training, Hallen, Catering, Zeitnehmer, Kasse, Galerie", einstellungen)}
   ${bereich("Kader", `${kader().length} Spieler`, kaderHtml)}
   ${bereich("Trainerteam", `${trainer.length} Trainer, Texte für die Mannschaftsseite`, trainerHtml)}
   ${bereich("Kalender-Abo", "Link erneuern, falls er weitergegeben wurde", `<p class="leise klein">Eltern abonnieren unter „Spiele“ einen Link mit allen Spielen und Terminen. Falls der Link an die falschen Leute geraten ist, hier einen neuen erzeugen. Danach müssen alle einmal neu abonnieren.</p>
     <button class="knopf zweit klein" data-aktion="kalender-link-neu">Neuen Kalender-Link erzeugen</button>`)}`;
 }
 
+// Kosten eines Termins: Jugend zahlt meist nur für zusätzliche Personen, Erwachsene (oder "alle") für jeden Teilnehmer
+const kostenFuer = (t) => t.kostenFuer || (erwachsen() ? "alle" : "zusatz");
+const zahlende = (t, a) => (a && a.kommt ? (kostenFuer(t) === "alle" ? 1 + (a.personen || 0) : a.personen || 0) : 0);
+const terminZeitraum = (t) => (t.bis && t.bis > t.datum ? `${wochentagKurz(t.datum)} ${kurzDatum(t.datum)} bis ${wochentagKurz(t.bis)} ${kurzDatum(t.bis)}` : "");
 function termineBereich() {
   const alle = [...(Z.termine || [])].sort((a, b) => (a.datum + (a.zeit || "")).localeCompare(b.datum + (b.zeit || "")));
-  const k = alle.filter((t) => t.datum >= heute()), v = alle.filter((t) => t.datum < heute());
+  const k = alle.filter((t) => (t.bis || t.datum) >= heute()), v = alle.filter((t) => (t.bis || t.datum) < heute());
   const familien = kader().map((x) => x.vorname);
+  const w = wirIhr();
   const karte = (t) => {
     const ant = (Z.antworten || []).filter((a) => a.terminId === t.id);
     const zu = ant.filter((a) => a.kommt), ab = ant.filter((a) => !a.kommt);
     const zusatz = zu.reduce((n, a) => n + (a.personen || 0), 0);
     const kosten = t.kostenProPerson || 0;
+    const anz = t.anzahlung || 0;
     const meine = meinKind() ? ant.find((a) => a.familie === meinKind()) : null;
     const offenFam = familien.filter((f) => !ant.some((a) => a.familie === f));
-    const bezahlt = zu.filter((a) => a.bezahlt).reduce((n, a) => n + (a.personen || 0) * kosten, 0);
-    const erwartet = zusatz * kosten;
+    const erwartet = zu.reduce((n, a) => n + zahlende(t, a) * kosten, 0);
+    const bezahlt = zu.filter((a) => a.bezahlt).reduce((n, a) => n + zahlende(t, a) * kosten, 0)
+      + zu.filter((a) => a.angezahlt && !a.bezahlt).reduce((n, a) => n + zahlende(t, a) * anz, 0);
+    const angezahlt = zu.filter((a) => a.angezahlt || a.bezahlt).length;
     const personenAuswahl = (wert) => Array.from({ length: 9 }, (_, i) => `<option value="${i}" ${i === (wert ?? 0) ? "selected" : ""}>${i}</option>`).join("");
+    const meinBetrag = meine ? zahlende(t, meine) * kosten : 0;
+    const statusZahlung = meine && meine.kommt && kosten ? ` <span class="leise">${erwachsen() ? "Dein Anteil" : "Kosten für euch"}: ${euro(meinBetrag)}${meine.bezahlt ? " · bezahlt ✓" : anz ? (meine.angezahlt ? ` · Anzahlung ${euro(zahlende(t, meine) * anz)} bezahlt ✓` : ` · Anzahlung ${euro(zahlende(t, meine) * anz)} noch offen`) : ""}</span>` : "";
+    const zusatzFrage = t.frage || (erwachsen() ? "Bringst du jemanden mit? (zusätzliche Personen)" : "Wie viele zusätzliche Personen kommen mit?");
     const eigene = meinKind() ? `<div class="antwort-box">
-        ${meine ? `<p class="gut" style="margin:0 0 8px">${meine.kommt ? `✓ Ihr seid dabei${meine.personen ? `, mit ${meine.personen} zusätzlichen ${meine.personen === 1 ? "Person" : "Personen"}` : ""}.` : "Ihr habt abgesagt."}${meine.kommt && kosten && meine.personen ? ` <span class="leise">Kosten für euch: ${euro(meine.personen * kosten)}${meine.bezahlt ? " · bezahlt ✓" : ""}</span>` : ""}</p>` : `<p style="margin:0 0 8px"><strong>Familie von ${esc(meinKind())}:</strong> Seid ihr dabei?</p>`}
+        ${meine ? `<p class="gut" style="margin:0 0 8px">${meine.kommt ? `✓ ${erwachsen() ? "Du bist" : "Ihr seid"} dabei${meine.personen ? `, mit ${meine.personen} zusätzlichen ${meine.personen === 1 ? "Person" : "Personen"}` : ""}.` : erwachsen() ? "Du hast abgesagt." : "Ihr habt abgesagt."}${statusZahlung}</p>`
+          : `<p style="margin:0 0 8px"><strong>${erwachsen() ? "Bist du dabei?" : `Familie von ${esc(meinKind())}:</strong> Seid ihr dabei?<strong>`}</strong></p>`}
         <form class="zeile" data-form="antwort" data-termin="${t.id}">
-          <div class="feld" style="flex-basis:100%"><label>${esc(t.frage || "Wie viele zusätzliche Personen kommen mit?")}</label>
+          <div class="feld" style="flex-basis:100%"><label>${esc(zusatzFrage)}</label>
             <select name="personen">${personenAuswahl(meine?.personen)}</select></div>
-          <button class="knopf">${meine ? "Ändern: wir kommen" : "Wir kommen"}</button>
-          <button type="button" class="knopf zweit" data-aktion="antwort-absage" data-termin="${t.id}">Wir können nicht</button>
+          <button class="knopf">${meine ? (erwachsen() ? "Ändern: ich bin dabei" : "Ändern: wir kommen") : erwachsen() ? "Ich bin dabei" : "Wir kommen"}</button>
+          <button type="button" class="knopf zweit" data-aktion="antwort-absage" data-termin="${t.id}">${erwachsen() ? "Ich kann nicht" : "Wir können nicht"}</button>
         </form>
-        ${kosten ? `<p class="leise klein" style="margin:8px 0 0">${euro(kosten)} pro zusätzlicher Person. Spieler und Trainer sind frei.</p>` : ""}
+        ${kosten ? `<p class="leise klein" style="margin:8px 0 0">${euro(kosten)} pro ${kostenFuer(t) === "alle" ? "Person" : "zusätzlicher Person. Spieler und Trainer sind frei"}.${anz ? ` Anzahlung ${euro(anz)} pro Person${t.anzahlungBis ? ` bis ${wochentagKurz(t.anzahlungBis)} ${kurzDatum(t.anzahlungBis)}` : "."}` : ""}</p>` : ""}
       </div>`
-      : `<p class="hinweis">Bitte zuerst deinen Sohn auswählen, dann kannst du für eure Familie zu- oder absagen. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`;
+      : `<p class="hinweis">Bitte zuerst ${erwachsen() ? "auswählen, wer du bist" : "deinen Sohn auswählen"}, dann kannst du zu- oder absagen. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`;
+    const spalteName = erwachsen() ? "Spieler" : "Familie";
     const verwaltung = istTrainer() ? `<details class="abstand"><summary>Verwalten und bearbeiten (${ant.length} von ${familien.length} Rückmeldungen)</summary>
-        <p class="leise klein">Zu- und Absagen aus WhatsApp kannst du hier für jede Familie eintragen.</p>
+        <p class="leise klein">Zu- und Absagen aus WhatsApp kannst du hier eintragen.</p>
         <div class="tabelle-wrap"><table class="antwort-tabelle">
-          <thead><tr><th>Familie</th><th>Dabei?</th><th>+ Pers.</th>${kosten ? `<th class="betrag">Betrag</th><th>Bezahlt</th>` : ""}</tr></thead>
+          <thead><tr><th>${spalteName}</th><th>Dabei?</th><th>+ Pers.</th>${kosten ? `<th class="betrag">Betrag</th>${anz ? "<th>Anzahlung</th>" : ""}<th>Bezahlt</th>` : ""}</tr></thead>
           <tbody>${familien.map((f) => {
             const a = ant.find((x) => x.familie === f);
-            const betrag = a && a.kommt ? (a.personen || 0) * kosten : 0;
+            const betrag = zahlende(t, a) * kosten;
+            const anzBetrag = zahlende(t, a) * anz;
             return `<tr>
               <td>${esc(f)}</td>
               <td><select data-aktion="antwort-admin" data-termin="${t.id}" data-familie="${esc(f)}" data-feld="kommt">
                 <option value="" ${!a ? "selected" : ""}>offen</option><option value="ja" ${a && a.kommt ? "selected" : ""}>ja</option><option value="nein" ${a && !a.kommt ? "selected" : ""}>nein</option></select></td>
               <td><select data-aktion="antwort-admin" data-termin="${t.id}" data-familie="${esc(f)}" data-feld="personen" ${a && a.kommt ? "" : "disabled"}>${personenAuswahl(a?.personen)}</select></td>
               ${kosten ? `<td class="betrag">${betrag ? euro(betrag) : "–"}</td>
-              <td>${!istAdmin() ? (a && a.bezahlt ? "✓" : "") : betrag ? (a.bezahlt ? `✓ <button class="link-knopf" data-aktion="antwort-bezahlt" data-termin="${t.id}" data-familie="${esc(f)}" data-wert="nein">zurück</button>` : `<button class="knopf klein" data-aktion="antwort-buchen" data-termin="${t.id}" data-familie="${esc(f)}">bezahlt + buchen</button>`) : ""}</td>` : ""}
+              ${anz ? `<td>${!betrag ? "" : a.angezahlt || a.bezahlt ? "✓" : istAdmin() ? `<button class="knopf klein zweit" data-aktion="antwort-anzahlung" data-termin="${t.id}" data-familie="${esc(f)}">${euro(anzBetrag)} buchen</button>` : "offen"}</td>` : ""}
+              <td>${!istAdmin() ? (a && a.bezahlt ? "✓" : "") : betrag ? (a.bezahlt ? `✓ <button class="link-knopf" data-aktion="antwort-bezahlt" data-termin="${t.id}" data-familie="${esc(f)}" data-wert="nein">zurück</button>` : `<button class="knopf klein" data-aktion="antwort-buchen" data-termin="${t.id}" data-familie="${esc(f)}">${a.angezahlt ? `Rest ${euro(betrag - anzBetrag)}` : "bezahlt"} + buchen</button>`) : ""}</td>` : ""}
             </tr>`;
           }).join("")}</tbody></table></div>
-        ${kosten ? `<p class="abstand"><strong>Eingegangen:</strong> ${euro(bezahlt)} von ${euro(erwartet)}</p>` : ""}
+        ${kosten ? `<p class="abstand"><strong>Eingegangen:</strong> ${euro(bezahlt)} von ${euro(erwartet)}${anz ? ` · Anzahlung von ${angezahlt} ${angezahlt === 1 ? "Teilnehmer" : "Teilnehmern"}` : ""}</p>` : ""}
         <h3 class="abstand">Termin bearbeiten</h3>
         ${terminFormular(t)}
         <button class="knopf klein gefahr abstand" data-aktion="loeschen" data-col="termine" data-id="${t.id}" data-frage="Termin mit allen Rückmeldungen löschen?">Termin löschen</button>
       </details>` : "";
-    return `<section class="karte termin-karte">
+    return `<section class="karte termin-karte ${t.bis && t.bis > t.datum ? "mehrtaegig" : ""}">
       <div class="spiel">${datumBlock(t.datum)}<div>
         <div class="spiel-titel">${esc(t.titel)}</div>
-        <div class="leise">${t.zeit ? esc(t.zeit) + " Uhr" : ""}${t.ort ? " · " + esc(t.ort) : ""}</div></div></div>
+        <div class="leise">${terminZeitraum(t) ? esc(terminZeitraum(t)) : t.zeit ? esc(t.zeit) + " Uhr" : ""}${t.ort ? " · " + esc(t.ort) : ""}</div>
+        ${kosten ? `<div class="klein">${euro(kosten)} pro ${kostenFuer(t) === "alle" ? "Person" : "zusätzlicher Person"}${anz ? ` · Anzahlung ${euro(anz)}${t.anzahlungBis ? ` bis ${kurzDatum(t.anzahlungBis)}` : ""}` : ""}</div>` : ""}</div></div>
       ${t.beschreibung ? `<div class="termin-text">${esc(t.beschreibung).replace(/\n/g, "<br>")}</div>` : ""}
       <div class="termin-stand">
         <span class="pill ok">${zu.length} dabei</span> <span class="pill neutral">${ab.length} abgesagt</span> <span class="pill offen">${offenFam.length} offen</span>
-        <span class="leise">· ${zusatz} zusätzliche Personen</span>
+        ${zusatz ? `<span class="leise">· ${zusatz} zusätzliche Personen</span>` : ""}
+        ${anz ? `<span class="leise">· ${angezahlt} angezahlt</span>` : ""}
       </div>
       ${t.frist && t.datum >= heute() ? `<p class="frist ${t.frist < heute() ? "vorbei" : fristBald(t.frist) ? "bald" : ""}">${t.frist < heute() ? `Rückmeldefrist war der ${kurzDatum(t.frist)}. Nachzügler bitte trotzdem eintragen.` : `Bitte bis <strong>${wochentagKurz(t.frist)} ${kurzDatum(t.frist)}</strong> zurückmelden.`}</p>` : ""}
       ${t.datum >= heute() ? eigene : ""}
@@ -1142,19 +1263,25 @@ function termineBereich() {
   return `${k.map((t, i) => `<div class="${i ? "abstand" : ""}">${karte(t)}</div>`).join("")}
   ${!k.length && istTrainer() ? `<p class="leer">Gerade steht kein Termin an.</p>` : ""}
   ${v.length ? `<details class="abstand"><summary>Vergangene Termine (${v.length})</summary><div class="abstand">${[...v].reverse().map(karte).join("")}</div></details>` : ""}
-  ${istTrainer() ? `<details class="karte abstand formular-klappe"><summary>Neuen Termin anlegen</summary><div class="abstand">${terminFormular(null)}</div></details>` : ""}`;
+  ${istTrainer() ? `<details class="karte abstand formular-klappe"><summary>Neuen Termin anlegen (Feier, Mannschaftsabend, Tour)</summary><div class="abstand">${terminFormular(null)}</div></details>` : ""}`;
 }
 
 function terminFormular(t) {
+  const geld = (c) => (c ? (c / 100).toFixed(2).replace(".", ",") : "");
+  const kf = t ? kostenFuer(t) : erwachsen() ? "alle" : "zusatz";
   return `<form class="zeile" data-form="termin" ${t ? `data-id="${t.id}"` : ""}>
-    <div class="feld" style="flex-basis:220px"><label>Titel</label><input type="text" name="titel" required maxlength="80" value="${esc(t?.titel || "")}"></div>
-    <div class="feld" style="flex-basis:150px"><label>Datum</label><input type="date" name="datum" required value="${esc(t?.datum || "")}"></div>
+    <div class="feld" style="flex-basis:220px"><label>Titel</label><input type="text" name="titel" required maxlength="80" value="${esc(t?.titel || "")}" placeholder="z. B. Mannschaftsabend, Mannschaftstour"></div>
+    <div class="feld" style="flex-basis:150px"><label>Datum (Beginn)</label><input type="date" name="datum" required value="${esc(t?.datum || "")}"></div>
+    <div class="feld" style="flex-basis:150px"><label>bis (bei mehreren Tagen)</label><input type="date" name="bis" value="${esc(t?.bis || "")}"></div>
     <div class="feld" style="flex-basis:110px"><label>Uhrzeit</label><input type="time" name="zeit" value="${esc(t?.zeit || "")}"></div>
     <div class="feld" style="flex-basis:200px"><label>Ort</label><input type="text" name="ort" maxlength="120" value="${esc(t?.ort || "")}"></div>
     <div class="feld" style="flex-basis:100%"><label>Beschreibung</label><textarea name="beschreibung" maxlength="2000">${esc(t?.beschreibung || "")}</textarea></div>
     <div class="feld" style="flex-basis:160px"><label>Rückmeldung bis</label><input type="date" name="frist" value="${esc(t?.frist || "")}"></div>
-    <div class="feld" style="flex-basis:160px"><label>Kosten je zusätzl. Person (€)</label><input type="text" inputmode="decimal" name="kosten" value="${t?.kostenProPerson ? (t.kostenProPerson / 100).toFixed(2).replace(".", ",") : ""}" placeholder="0,00"></div>
-    <div class="feld" style="flex-basis:300px"><label>Frage an die Eltern</label><input type="text" name="frage" maxlength="160" value="${esc(t?.frage || "Wie viele zusätzliche Personen (Eltern, Geschwister) kommen mit?")}"></div>
+    <div class="feld" style="flex-basis:150px"><label>Kosten pro Person (€)</label><input type="text" inputmode="decimal" name="kosten" value="${geld(t?.kostenProPerson)}" placeholder="0,00"></div>
+    <div class="feld" style="flex-basis:220px"><label>Kosten gelten für</label><select name="kostenFuer"><option value="alle" ${kf === "alle" ? "selected" : ""}>jeden Teilnehmer</option><option value="zusatz" ${kf === "zusatz" ? "selected" : ""}>nur zusätzliche Personen</option></select></div>
+    <div class="feld" style="flex-basis:150px"><label>Anzahlung pro Person (€)</label><input type="text" inputmode="decimal" name="anzahlung" value="${geld(t?.anzahlung)}" placeholder="optional"></div>
+    <div class="feld" style="flex-basis:160px"><label>Anzahlung bis</label><input type="date" name="anzahlungBis" value="${esc(t?.anzahlungBis || "")}"></div>
+    <div class="feld" style="flex-basis:300px"><label>Frage zu zusätzlichen Personen</label><input type="text" name="frage" maxlength="160" value="${esc(t?.frage ?? (erwachsen() ? "" : "Wie viele zusätzliche Personen (Eltern, Geschwister) kommen mit?"))}" placeholder="${erwachsen() ? "Bringst du jemanden mit?" : ""}"></div>
     <button class="knopf">${t ? "Speichern" : "Termin anlegen"}</button>
   </form>`;
 }
@@ -1218,9 +1345,9 @@ const wochentagKurz = (iso) => datum(iso).toLocaleDateString("de-DE", { weekday:
 // offene Rückmeldungen (Termine und Abfragen) für Hinweise und WhatsApp
 function offeneRueckmeldungen() {
   const n = kader().length;
-  const termine = (Z.termine || []).filter((t) => t.datum >= heute() && (datum(t.datum) - datum(heute())) / 864e5 <= 60)
+  const termine = (modul("termine") ? Z.termine || [] : []).filter((t) => t.datum >= heute() && (datum(t.datum) - datum(heute())) / 864e5 <= 60)
     .map((t) => ({ art: "termin", titel: t.titel, datum: t.datum, frist: t.frist, offen: n - new Set((Z.antworten || []).filter((a) => a.terminId === t.id).map((a) => a.familie)).size, meins: !!(meinKind() && (Z.antworten || []).some((a) => a.terminId === t.id && a.familie === meinKind())) }));
-  const abfragen = (Z.abfragen || []).filter(abfrageOffen)
+  const abfragen = (modul("abfragen") ? Z.abfragen || [] : []).filter(abfrageOffen)
     .map((a) => ({ art: "abfrage", titel: a.titel, frist: a.frist, offen: n - new Set((Z.abfrageAntworten || []).filter((x) => x.abfrageId === a.id).map((x) => x.spieler)).size, meins: !!(meinKind() && abfrageAntwort(a, meinKind())) }));
   return [...termine, ...abfragen].filter((x) => x.offen > 0);
 }
@@ -1260,15 +1387,15 @@ function abfrageKarte(a) {
   const meine = meinKind() ? abfrageAntwort(a, meinKind()) : null;
   const gewaehlt = new Set((meine?.gewaehlt || "").split(","));
   const formular = !offen ? "" : meinKind() ? `<div class="antwort-box">
-      ${meine ? `<p class="gut" style="margin:0 0 8px">✓ Antwort für ${esc(meinKind())}: ${esc(antwortText(a, meine))}</p>` : `<p style="margin:0 0 8px"><strong>Antwort für ${esc(meinKind())}</strong></p>`}
+      ${meine ? `<p class="gut" style="margin:0 0 8px">✓ ${erwachsen() ? "Deine Antwort" : "Antwort für " + esc(meinKind())}: ${esc(antwortText(a, meine))}</p>` : `<p style="margin:0 0 8px"><strong>${erwachsen() ? "Deine Antwort" : "Antwort für " + esc(meinKind())}</strong></p>`}
       <form data-form="abfrage" data-id="${a.id}">
         ${opt.length ? `<div class="optionen">${opt.map((o, i) => `<label class="option"><input type="checkbox" name="o" value="${i}" ${gewaehlt.has(String(i)) ? "checked" : ""}> <span>${esc(o)}</span></label>`).join("")}</div>`
-          : `<div class="optionen"><label class="option"><input type="radio" name="o" value="ja" ${meine?.gewaehlt === "ja" ? "checked" : ""} required> <span>Ja, ist dabei</span></label><label class="option"><input type="radio" name="o" value="nein" ${meine?.gewaehlt === "nein" ? "checked" : ""}> <span>Nein</span></label></div>`}
+          : `<div class="optionen"><label class="option"><input type="radio" name="o" value="ja" ${meine?.gewaehlt === "ja" ? "checked" : ""} required> <span>${erwachsen() ? "Ja, bin dabei" : "Ja, ist dabei"}</span></label><label class="option"><input type="radio" name="o" value="nein" ${meine?.gewaehlt === "nein" ? "checked" : ""}> <span>Nein</span></label></div>`}
         <input type="text" name="bemerkung" maxlength="200" placeholder="Bemerkung (optional)" value="${esc(meine?.bemerkung || "")}" aria-label="Bemerkung">
         <div class="ausrichten" style="margin-top:10px"><button class="knopf">${meine ? "Antwort ändern" : "Antwort senden"}</button>
           ${opt.length ? `<span class="leise klein">Nichts angekreuzt heißt: an keinem Termin.</span>` : ""}</div>
       </form></div>`
-    : `<p class="hinweis">Bitte zuerst deinen Sohn auswählen, dann kannst du antworten. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`;
+    : `<p class="hinweis">Bitte zuerst ${erwachsen() ? "auswählen, wer du bist" : "deinen Sohn auswählen"}, dann kannst du antworten. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`;
   const spalten = opt.length ? opt : ["Dabei"];
   const zelle = (n, i) => {
     const x = antworten.find((y) => y.spieler === n);
@@ -1313,20 +1440,21 @@ function seiteInfos() {
   const alt = abfragen.filter((a) => !aktuell.includes(a));
   const in14 = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
   const termine = termineBereich();
-  return `${kopfzeile("Trainerteam, Feiern, Abfragen", "Infos & Termine")}
-  <section class="karte"><h2>Infos vom Trainerteam</h2>${hinweiseKarte()}
+  return `${kopfzeile("Trainerteam, Feiern, Abfragen", [modul("infos") && "Infos", modul("termine") && "Termine", !modul("infos") && !modul("termine") && "Abfragen"].filter(Boolean).join(" & "))}
+  ${modul("infos") ? `<section class="karte"><h2>Infos vom Trainerteam</h2>${hinweiseKarte()}
     ${istTrainer() ? `<details class="abstand"><summary>Neue Info schreiben</summary>
       <form data-form="hinweis">
         <div class="feld"><label>Text</label><textarea name="text" required maxlength="600" placeholder="z. B. Training am Freitag fällt aus, die Halle ist belegt."></textarea></div>
+        <label class="schalter"><input type="checkbox" name="push"> Auch als Push-Nachricht an alle senden (Eltern und Spieler mit eingeschalteten Benachrichtigungen)</label>
         <div class="zeile"><div class="feld" style="flex-basis:160px"><label>Anzeigen bis</label><input type="date" name="bis" value="${in14}"></div>
         <button class="knopf">Veröffentlichen</button></div>
       </form></details>` : ""}
-  </section>
-  ${termine.trim() ? `<h2 class="bereich-titel">Termine</h2>${termine}` : ""}
-  ${aktuell.length || istTrainer() ? `<h2 class="bereich-titel">Abfragen</h2>` : ""}
-  ${aktuell.map((a, i) => `<div class="${i ? "abstand" : ""}">${abfrageKarte(a)}</div>`).join("")}
-  ${istTrainer() ? `<details class="karte abstand formular-klappe"><summary>Neue Abfrage starten</summary><div class="abstand">
-      <p class="leise klein">Zum Beispiel: Wer ist in den Herbstferien beim Training? Die Eltern antworten für ihren Sohn, du siehst sofort die Übersicht.</p>
+  </section>` : ""}
+  ${modul("termine") && termine.trim() ? `<h2 class="bereich-titel">Termine</h2>${termine}` : ""}
+  ${modul("abfragen") && (aktuell.length || istTrainer()) ? `<h2 class="bereich-titel">Abfragen</h2>` : ""}
+  ${modul("abfragen") ? aktuell.map((a, i) => `<div class="${i ? "abstand" : ""}">${abfrageKarte(a)}</div>`).join("") : ""}
+  ${modul("abfragen") && istTrainer() ? `<details class="karte abstand formular-klappe"><summary>Neue Abfrage starten</summary><div class="abstand">
+      <p class="leise klein">${erwachsen() ? "Zum Beispiel: Wie lange kannst du bei der Mannschaftstour? Jeder antwortet für sich, du siehst sofort die Übersicht." : "Zum Beispiel: Wer ist in den Herbstferien beim Training? Die Eltern antworten für ihren Sohn, du siehst sofort die Übersicht."}</p>
       <form data-form="abfrage-neu">
         <div class="feld"><label>Frage</label><input type="text" name="titel" required maxlength="120" placeholder="Training in den Herbstferien"></div>
         <div class="feld"><label>Erklärung (optional)</label><textarea name="text" maxlength="800"></textarea></div>
@@ -1334,15 +1462,19 @@ function seiteInfos() {
         <div class="zeile"><div class="feld" style="flex-basis:160px"><label>Antworten bis</label><input type="date" name="frist"></div>
         <button class="knopf">Abfrage starten</button></div>
       </form></div></details>` : ""}
-  ${alt.length ? `<details class="abstand"><summary>Frühere Abfragen (${alt.length})</summary>${alt.map((a) => `<div class="abstand">${abfrageKarte(a)}</div>`).join("")}</details>` : ""}`;
+  ${modul("abfragen") && alt.length ? `<details class="abstand"><summary>Frühere Abfragen (${alt.length})</summary>${alt.map((a) => `<div class="abstand">${abfrageKarte(a)}</div>`).join("")}</details>` : ""}`;
 }
 
 function seiteDatenschutz() {
   return `${kopfzeile("Kurz und klar", "Datenschutz")}
   <section class="karte">
-    <p>Diese Seite ist ein privates Angebot der Eltern der männlichen C-Jugend des Ohligser TV 1888 e.V. Sie ist passwortgeschützt und nur für Eltern der Mannschaft gedacht. Suchmaschinen sind ausgeschlossen.</p>
+    <p>${erwachsen() ? `Diese Seite ist ein privates Angebot der Mannschaft ${esc(Z.einstellungen.mannschaftName || "")}${Z.einstellungen.vereinName ? " (" + esc(Z.einstellungen.vereinName) + ")" : ""}. Sie ist passwortgeschützt und nur für Spieler und Trainer der Mannschaft gedacht.` : `Diese Seite ist ein privates Angebot der Eltern der ${esc(Z.einstellungen.mannschaftName || "Mannschaft")}${Z.einstellungen.vereinName ? " des " + esc(Z.einstellungen.vereinName) : ""}. Sie ist passwortgeschützt und nur für Eltern der Mannschaft gedacht.`} Suchmaschinen sind ausgeschlossen.</p>
     <h3>Welche Daten gespeichert werden</h3>
     <p>Namen und Angaben, die ihr selbst eintragt (Standdienst, Mitbringliste, Trikotplan, Fotos), die Buchungen der Mannschaftskasse sowie Vornamen der Spieler. Gespeichert wird bei Netlify (Netlify, Inc.). Für die Anmeldung wird ein technisch notwendiges Cookie gesetzt. Euer Browser merkt sich lokal eine zufällige Gerätekennung und euren zuletzt eingetragenen Namen, damit ihr eigene Einträge wieder entfernen könnt.</p>
+    <h3>Spieler-Zugang</h3>
+    <p>Die Jungs können sich mit einem eigenen Passwort für Training und Spiele an- und abmelden. Gespeichert werden dabei Vorname, Zu- oder Absage und ein optionaler kurzer Hinweis. Bitte keine Gesundheitsangaben eintragen, „kann nicht“ genügt. Der Spieler-Zugang sieht weder die Kasse noch Einträge der Eltern außer den Fahrgemeinschaften.</p>
+    <h3>Benachrichtigungen</h3>
+    <p>Wer Erinnerungen einschaltet, erlaubt dem Browser, Nachrichten zu empfangen. Gespeichert wird dafür eine technische Adresse des Browsers (vom Hersteller, z. B. Google oder Apple, vergeben), die Rolle und der Vorname. Ausschalten geht jederzeit unter Mehr › Benachrichtigungen oder in den Einstellungen des Handys.</p>
     <h3>Fotos</h3>
     <p>Fotos werden nur mit Einverständnis der abgebildeten Personen beziehungsweise ihrer Eltern hochgeladen. Wer ein Foto entfernt haben möchte, nutzt in der Galerie „Melden“. Das Foto wird sofort ausgeblendet und von der Kassenführung geprüft.</p>
     <h3>handball.net</h3>
@@ -1479,10 +1611,10 @@ function abrechnungsFormular() {
       </div>
       <h3 class="abstand">Einnahmen</h3>
       <div class="zeile">${e.kassenKanaele.map((k) => `<div class="feld" style="flex-basis:130px"><label>${esc(k)} (€)</label><input type="text" inputmode="decimal" name="ein:${esc(k)}" placeholder="0,00"></div>`).join("")}</div>
-      <h3 class="abstand">Getränke (verkaufte Stück)</h3>
+      ${modul("strichliste") ? `<h3 class="abstand">Getränke (verkaufte Stück)</h3>
       <p class="leise klein">Aus der Strichliste des Standdienstes vorausgefüllt, bitte mit der Papierliste abgleichen. Der Verkauf ist im Bargeld oben schon enthalten. ${e.otvAnteilProzent ?? 50} % des Getränkeumsatzes gehen an den OTV und werden als „offen an den OTV“ gebucht.</p>
       <div class="zeile getraenke-felder">${getraenkeListe().map((g) => `<div class="feld" style="flex-basis:120px"><label>${esc(g.name)} <span class="leise">${euro(g.preis)}</span></label><input type="number" min="0" step="1" inputmode="numeric" name="g:${esc(g.name)}" value="${(vorschlag && strichVon(vorschlag)[g.name]) || ""}" placeholder="0"></div>`).join("")}</div>
-      <p class="getraenke-ergebnis" id="getraenke-ergebnis"></p>
+      <p class="getraenke-ergebnis" id="getraenke-ergebnis"></p>` : ""}
       <h3 class="abstand">Ausgaben</h3>
       <div class="zeile">
         <div class="feld" style="flex-basis:150px"><label>Einkauf Catering (€)</label><input type="text" inputmode="decimal" name="einkauf" placeholder="0,00"></div>
@@ -1567,7 +1699,13 @@ function spielNachricht(sp) {
   z.push(`Halle: ${halle || "folgt"}`);
   // 3. Was fehlt, was steht
   const fehlt = [], steht = [];
-  if (sp.heim) {
+  for (const art of sp.heim ? dienstArten() : []) {
+    const wer = dienstVon(sp, art);
+    const frei = art.personen - wer.length;
+    if (frei > 0) fehlt.push(`${frei}× ${art.name}${dienstZeitText(sp, art) ? ` (${dienstZeitText(sp, art)})` : ""}`);
+    if (wer.length) steht.push(`${art.name}: ${wer.map((d) => d.person || anzeigeName(d.name)).join(", ")}`);
+  }
+  if (sp.heim && modul("standdienst")) {
     const st = cateringStatus(sp);
     const dienst = Z.standdienst.filter((x) => x.spielId === sp.id && !x.reserve);
     const frei = st.plaetze - st.dienst;
@@ -1579,14 +1717,16 @@ function spielNachricht(sp) {
       const zus = Z.catering.filter((c) => c.spielId === sp.id && c.artikel === a.name);
       if (zus.length) steht.push(`${a.name}: ${zus.map((c) => anzeigeName(c.name)).join(", ")}`);
     }
-  } else {
+  } else if (!sp.heim && modul("fahrten")) {
     const st = fahrtStatus(sp);
     if (!st.fahrten.length) fehlt.push("Fahrer mit freien Plätzen");
     for (const f of st.fahrten) {
       const mit = Z.mitfahrer.filter((m) => m.fahrtId === f.id).map((m) => m.name);
       const frei = f.plaetze - mit.length;
-      steht.push(`${anzeigeName(f.fahrer)} fährt: ${frei > 0 ? `${frei} ${frei === 1 ? "Platz" : "Plätze"} frei` : "voll"}${f.treffpunkt ? `, Abfahrt ${abfahrtText(f.treffpunkt)}` : ""}${mit.length ? `, dabei: ${mit.join(", ")}` : ""}`);
+      steht.push(`${anzeigeName(f.fahrer)} fährt${richtungText(f) ? ` (${richtungText(f)})` : ""}: ${frei > 0 ? `${frei} ${frei === 1 ? "Platz" : "Plätze"} frei` : "voll"}${f.treffpunkt ? `, Abfahrt ${abfahrtText(f.treffpunkt)}` : ""}${mit.length ? `, dabei: ${mit.join(", ")}` : ""}`);
     }
+    const bedarf = bedarfVon(sp);
+    if (bedarf.length) fehlt.push(`Fahrt für ${bedarf.map(bedarfText).join(", ")}`);
   }
   if (zeitnehmerNoetig(sp)) {
     const zn = zeitnehmerVon(sp);
@@ -1621,37 +1761,55 @@ function fahrtenText(s) {
   for (const f of st.fahrten) {
     const mit = Z.mitfahrer.filter((m) => m.fahrtId === f.id).map((m) => m.name);
     const frei = f.plaetze - mit.length;
-    z.push(`${anzeigeName(f.fahrer)}${f.treffpunkt ? " · " + f.treffpunkt : ""}: ${mit.length ? mit.join(", ") : "noch niemand"}${frei > 0 ? ` (noch ${frei} frei)` : " (voll)"}`);
+    z.push(`${anzeigeName(f.fahrer)}${richtungText(f) ? ` (${richtungText(f)})` : ""}${f.treffpunkt ? " · " + f.treffpunkt : ""}: ${mit.length ? mit.join(", ") : "noch niemand"}${frei > 0 ? ` (noch ${frei} frei)` : " (voll)"}`);
   }
+  const bedarf = bedarfVon(s);
+  if (bedarf.length) z.push("", `❗ Suchen noch eine Fahrt: ${bedarf.map(bedarfText).join(", ")}`);
   z.push("", `Eintragen: ${location.origin}/#/fahrten`);
   return z.join("\n");
 }
 
 function fahrtenDetails(s) {
     const st = fahrtStatus(s);
-    const vergeben = new Set(Z.mitfahrer.filter((m) => st.fahrten.some((f) => f.id === m.fahrtId)).map((m) => m.name));
-    const kinder = kader().map((x) => x.vorname).filter((n) => !vergeben.has(n));
+    const eigeneFahrten = st.fahrten.filter((f) => f.eigen);
     const fahrten = st.fahrten.map((f) => {
       const mit = Z.mitfahrer.filter((m) => m.fahrtId === f.id).sort((a, b) => a.erstellt.localeCompare(b.erstellt));
       const frei = f.plaetze - mit.length;
+      const kinder = kader().map((x) => x.vorname).filter((n) => !fahrtKonflikt(n, f));
+      const andere = (m) => st.fahrten.some((g) => g.id !== f.id && Z.mitfahrer.filter((x) => x.fahrtId === g.id).length < g.plaetze && !fahrtKonflikt(m.name, g, m.id));
       return `<li class="fahrt">
         <div class="fahrt-kopf">
-          <div><strong>${esc(anzeigeName(f.fahrer))}</strong> <span class="pill ${frei > 0 ? "ok" : "neutral"}">${frei > 0 ? `${frei} von ${f.plaetze} frei` : "voll"}</span>
+          <div><strong>${esc(anzeigeName(f.fahrer))}</strong> <span class="pill ${frei > 0 ? "ok" : "neutral"}">${frei > 0 ? `${frei} von ${f.plaetze} frei` : "voll"}</span>${richtungText(f) ? ` <span class="pill neutral">${richtungText(f)}</span>` : ""}
             ${f.treffpunkt ? `<div class="leise klein">Abfahrt: ${esc(abfahrtText(f.treffpunkt))}</div>` : ""}
             ${f.hinweis ? `<div class="leise klein">${esc(f.hinweis)}</div>` : ""}</div>
           ${darfLoeschen(f) ? `<button class="link-knopf" style="color:var(--rot)" data-aktion="loeschen" data-col="fahrten" data-id="${f.id}" data-frage="Fahrt löschen? Eingetragene Mitfahrer werden mit entfernt.">Fahrt löschen</button>` : ""}
         </div>
-        <div>${mit.map((m) => `<span class="chip">${esc(m.name)}${darfLoeschen(m) ? `<button class="x" title="austragen" data-aktion="loeschen" data-col="mitfahrer" data-id="${m.id}" data-frage="${esc(m.name)} austragen?">×</button>` : `<span style="width:6px"></span>`}</span>`).join("")}</div>
+        <div>${mit.map((m) => { const darf = darfLoeschen(m) || f.eigen; return `<span class="chip">${esc(m.name)}${darf && andere(m) ? `<button class="x" title="in ein anderes Auto umsteigen" aria-label="${esc(m.name)} umsteigen" data-aktion="umsteigen" data-id="${m.id}">⇄</button>` : ""}${darf ? `<button class="x" title="austragen" data-aktion="loeschen" data-col="mitfahrer" data-id="${m.id}" data-frage="${esc(m.name)} austragen?">×</button>` : `<span style="width:6px"></span>`}</span>`; }).join("")}</div>
         ${frei > 0 ? `<form class="zeile mitfahren" data-form="mitfahrer" data-fahrt="${f.id}">
           <div class="feld"><select name="name" aria-label="Spieler auswählen">${kinder.length ? `<option value="">Spieler auswählen …</option>${kinder.map((n) => `<option ${n === meinKind() ? "selected" : ""}>${esc(n)}</option>`).join("")}` : `<option value="">alle Jungs eingetragen</option>`}<option value="__andere">jemand anderes …</option></select></div>
           <button class="knopf klein">Mitfahren</button></form>` : ""}
       </li>`;
     }).join("");
-  return `${fahrten ? `<ul class="liste">${fahrten}</ul>` : `<p class="leer">Noch bietet niemand Plätze an.</p>`}
+  const bedarf = bedarfVon(s);
+  const bedarfHtml = bedarf.length ? `<div class="fahrt-gesucht"><strong>Suchen noch eine Fahrt</strong><ul class="liste">${bedarf.map((b) => {
+      const passend = eigeneFahrten.find((f) => Z.mitfahrer.filter((m) => m.fahrtId === f.id).length < f.plaetze && strecken(f.richtung).some((r) => strecken(b.richtung).includes(r)) && !fahrtKonflikt(b.spieler, f));
+      return `<li><span>${esc(bedarfText(b))}${b.von ? `<div class="leise klein">gemeldet von ${esc(anzeigeName(b.von))}</div>` : ""}</span><span class="ausrichten">
+        ${passend ? `<button class="knopf klein" data-aktion="mitnehmen" data-id="${b.id}" data-fahrt="${passend.id}">Nehme ich mit</button>` : ""}
+        ${b.eigen || istAdmin() ? `<button class="link-knopf" data-aktion="loeschen" data-col="fahrtbedarf" data-id="${b.id}" data-frage="Eintrag entfernen?">entfernen</button>` : ""}</span></li>`; }).join("")}</ul></div>` : "";
+  const ohneFahrt = kader().map((x) => x.vorname).filter((n) => !Z.mitfahrer.some((m) => m.name === n && st.fahrten.some((f) => f.id === m.fahrtId && strecken(f.richtung).length === 2)));
+  return `${bedarfHtml}${fahrten ? `<ul class="liste">${fahrten}</ul>` : `<p class="leer">Noch bietet niemand Plätze an.</p>`}
+        <details class="abstand fahrt-anbieten"><summary>${erwachsen() ? "Ich suche eine Fahrt" : "Wir brauchen noch eine Fahrt"}</summary>
+          <form class="zeile" data-form="fahrtbedarf" data-spiel="${s.id}">
+            <div class="feld" style="flex-basis:160px"><label>Für</label><select name="spieler">${ohneFahrt.map((n) => `<option ${n === meinKind() ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div>
+            <div class="feld" style="flex-basis:180px"><label>Strecke</label><select name="richtung"><option value="beide">hin und zurück</option><option value="hin">nur Hinfahrt</option><option value="rueck">nur Rückfahrt</option></select></div>
+            <button class="knopf zweit">Fahrt suchen</button>
+          </form>
+          <p class="leise klein">${erwachsen() ? "Fahrer sehen das und können dich mit einem Klick mitnehmen." : "Fahrer sehen das und können dein Kind mit einem Klick mitnehmen."}</p></details>
         <details class="abstand fahrt-anbieten" id="anbieten-${s.id}"><summary>Ich fahre und habe Plätze frei</summary>
           <form class="zeile" data-form="fahrt" data-spiel="${s.id}">
             <div class="feld" style="flex-basis:110px"><label>Freie Plätze</label><select name="plaetze">${[1, 2, 3, 4, 5, 6].map((n) => `<option ${n === 3 ? "selected" : ""}>${n}</option>`).join("")}</select></div>
-            <div class="feld" style="flex-basis:240px"><label>Abfahrt: Uhrzeit und Treffpunkt</label><input type="text" name="treffpunkt" maxlength="120" placeholder="${treffzeit(s) ? `z. B. Abfahrt ${abfahrtVorschlag(s)} Uhr am OTV-Parkplatz` : "z. B. Abfahrt am OTV-Parkplatz"}"></div>
+            <div class="feld" style="flex-basis:170px"><label>Strecke</label><select name="richtung"><option value="beide">hin und zurück</option><option value="hin">nur Hinfahrt</option><option value="rueck">nur Rückfahrt</option></select></div>
+            <div class="feld" style="flex-basis:240px"><label>Abfahrt: Uhrzeit und Treffpunkt</label><input type="text" name="treffpunkt" maxlength="120" placeholder="${erwachsen() ? `z. B. ${treffzeit(s) ? abfahrtVorschlag(s) + " Uhr " : ""}ab Haan Ost` : treffzeit(s) ? `z. B. Abfahrt ${abfahrtVorschlag(s)} Uhr am OTV-Parkplatz` : "z. B. Abfahrt am OTV-Parkplatz"}"></div>
             <div class="feld" style="flex-basis:200px"><label>Hinweis</label><input type="text" name="hinweis" maxlength="160" placeholder="optional, z. B. nur Hinfahrt"></div>
             <button class="knopf">Fahrt anbieten</button>
           </form></details>`;
@@ -1716,10 +1874,30 @@ function willkommen({ nurName = false } = {}) {
     const box = document.createElement("div");
     box.className = "lightbox";
     box.setAttribute("role", "dialog");
+    if (Z.rolle === "spieler" || (erwachsen() && Z.rolle !== "trainer")) {
+      box.innerHTML = `<form class="dialog-box"><h2>${nurName ? "Wer bist du?" : "Hallo!"}</h2>
+        <p>${nurSpielerSicht() ? "Hier meldest du dich für Training und Spiele an oder ab. So weiß das Trainerteam, wer kommt." : "Hier organisieren wir als Mannschaft alles rund um die Spiele: Dienste, Fahrten, Termine und Kasse. Bitte einmal auswählen, wer du bist."}</p>
+        <label for="w-kind">Dein Name</label>
+        <select id="w-kind" required><option value="">bitte wählen …</option>${kader().map((k) => `<option ${k.vorname === meinKind() ? "selected" : ""}>${esc(k.vorname)}</option>`).join("")}</select>
+        ${installHinweis()}
+        <div class="ausrichten abstand" style="margin-top:16px"><button class="knopf gross">Los geht’s</button><button type="button" class="link-knopf" data-w="spaeter">später</button></div></form>`;
+      const zu = (wert) => { lokal("otv_willkommen", "1"); box.remove(); fertig(wert); };
+      box.querySelector("form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const kind = box.querySelector("#w-kind").value;
+        if (!kind) return;
+        lokal("otv_vorname", kind); lokal("otv_kind", kind); lokal("otv_name", kind);
+        kopfAktualisieren(); pushAuffrischen();
+        zu(kind);
+      });
+      box.querySelector("[data-w=spaeter]").addEventListener("click", () => zu(""));
+      document.body.appendChild(box);
+      return;
+    }
     box.innerHTML = `<form class="dialog-box">
       ${nurName ? `<h2>Wie heißt du?</h2><p class="leise">Damit die anderen sehen, wer sich eingetragen hat.</p>`
         : `<h2>Willkommen!</h2>
-        <p>Hier organisieren wir Eltern alles rund um die Spiele der C-Jugend: Standdienst, Kuchen, Fahrten, Trikots und Kasse.</p>
+        <p>${erwachsen() ? "Hier organisieren wir als Mannschaft alles rund um die Spiele: Dienste, Fahrten, Termine und Kasse." : `Hier organisieren wir Eltern alles rund um die Spiele der ${esc(Z.einstellungen.mannschaftName || "Mannschaft")}: Standdienst, Kuchen, Fahrten, Trikots und Kasse.`}</p>
         <ul class="punkte-liste">
           <li>Eintragen geht mit einem Klick, austragen genauso.</li>
           <li>Was du zugesagt hast, steht auf der Startseite unter <strong>Meine Termine</strong>.</li>
@@ -1727,8 +1905,8 @@ function willkommen({ nurName = false } = {}) {
         </ul>`}
       <label for="w-name">Dein Vorname <span class="leise klein">(bitte ohne Nachnamen)</span></label>
       <input id="w-name" type="text" maxlength="40" required value="${esc(meinVorname())}" placeholder="z. B. Peggy" autocomplete="given-name">
-      <label for="w-kind" class="abstand" style="margin-top:12px">Dein Sohn in der Mannschaft</label>
-      <select id="w-kind"><option value="">${Z.rolle === "trainer" ? "kein Sohn, ich bin Trainer" : "bitte wählen …"}</option>${kader().map((k) => `<option ${k.vorname === meinKind() ? "selected" : ""}>${esc(k.vorname)}</option>`).join("")}</select>
+      <label for="w-kind" class="abstand" style="margin-top:12px">${erwachsen() ? "Spielst du selbst mit?" : "Dein Sohn in der Mannschaft"}</label>
+      <select id="w-kind"><option value="">${erwachsen() ? "nein, ich bin Trainer oder Betreuer" : Z.rolle === "trainer" ? "kein Sohn, ich bin Trainer" : "bitte wählen …"}</option>${kader().map((k) => `<option ${k.vorname === meinKind() ? "selected" : ""}>${esc(k.vorname)}</option>`).join("")}</select>
       ${nurName ? "" : installHinweis()}
       <div class="ausrichten abstand" style="margin-top:16px">
         <button class="knopf gross">${nurName ? "Weiter" : "Los geht’s"}</button>
@@ -1744,8 +1922,9 @@ function willkommen({ nurName = false } = {}) {
       if (!vorname) return;
       lokal("otv_vorname", vorname);
       lokal("otv_kind", kind);
-      lokal("otv_name", kind ? `${vorname} (${kind})` : Z.rolle === "trainer" ? `${vorname} (Trainer)` : vorname);
-      kopfAktualisieren();
+      lokal("otv_name", erwachsen() ? (kind || (Z.rolle === "trainer" ? `${vorname} (Trainer)` : vorname)) : kind ? `${vorname} (${kind})` : Z.rolle === "trainer" ? `${vorname} (Trainer)` : vorname);
+      if (erwachsen() && kind) lokal("otv_vorname", kind);
+      kopfAktualisieren(); pushAuffrischen();
       schliessen(gemerkterName());
     });
     box.querySelector("[data-w=spaeter]").addEventListener("click", () => schliessen(""));
@@ -1765,23 +1944,46 @@ function kopfAktualisieren() {
   const v = meinVorname();
   $("#hallo").textContent = v ? v : "Name eintragen";
   $("#hallo").title = "Name ändern";
-  const galerieSichtbar = Z && (Z.einstellungen.galerieAktiv || istAdmin());
+  const galerieSichtbar = Z && modul("galerie") && (Z.einstellungen.galerieAktiv || istAdmin());
   document.body.classList.toggle("ohne-galerie", !galerieSichtbar);
+}
+
+// Navigation und Kopfzeile nach Modulen und Mannschaft ausrichten
+function navAnpassen() {
+  if (!Z) return;
+  const e = Z.einstellungen;
+  const aus = { "#/kasse": !modul("kasse"), "#/trikots": !modul("trikots"), "#/galerie": !modul("galerie"), "#/anwesenheit": !modul("anwesenheit"),
+    "#/infos": !modul("infos") && !modul("termine") && !modul("abfragen") };
+  document.querySelectorAll(".nav a, .unten-nav a").forEach((a) => { a.hidden = !!aus[a.getAttribute("href")]; });
+  const un = $("#unten-nav");
+  if (un) un.style.gridTemplateColumns = `repeat(${[...un.children].filter((c) => getComputedStyle(c).display !== "none").length || 1}, 1fr)`;
+  const name = e.mannschaftName || "Mannschaft";
+  const verein = e.vereinName || "";
+  const bereich = erwachsen() ? "Mannschaftsbereich" : "Elternbereich";
+  const m = $(".marke-text");
+  if (m) m.innerHTML = `<strong>${esc(name)}</strong><span>${esc([verein, bereich].filter(Boolean).join(" · "))}</span>`;
+  const f = $("footer .innen span");
+  if (f) f.textContent = `${erwachsen() ? "Mannschaftsseite" : "Private Elternseite"} ${name}${verein ? " · " + verein : ""} · Version 2.0`;
+  document.title = `${name} · ${bereich}`;
+  const infosText = [modul("infos") && "Infos", modul("termine") && "Termine"].filter(Boolean).join(" & ") || "Abfragen";
+  const navInfos = $('.nav a[href="#/infos"]'); if (navInfos) navInfos.textContent = infosText;
 }
 
 function mehrMenue() {
   const box = document.createElement("div");
   box.className = "lightbox sheet-hinter";
-  const links = [
-    ["#/trikots", "", "Trikots waschen"], ["#/mannschaft", "", "Mannschaft und Training"],
-    ...(Z.einstellungen.galerieAktiv || istAdmin() ? [["#/galerie", "📷", "Galerie"]] : []),
+  const links = nurSpielerSicht() ? [["#/mannschaft", "", "Mannschaft und Trainingszeiten"], ...(Z.demo ? [["#/funktionen", "", "Was kann die Seite? (Demo)"]] : [])] : [
+    ...(modul("anwesenheit") ? [["#/anwesenheit", "", istTrainer() ? "Anwesenheit Training und Spiele" : erwachsen() ? "Training und Spiele: zu- und absagen" : "Training und Spiele: Meldungen ansehen"]] : []),
+    ...(modul("trikots") ? [["#/trikots", "", "Trikots waschen"]] : []), ["#/mannschaft", "", "Mannschaft und Training"],
+    ...(modul("galerie") && (Z.einstellungen.galerieAktiv || istAdmin()) ? [["#/galerie", "📷", "Galerie"]] : []),
     ...(istAdmin() ? [["#/verwaltung", "⚙️", "Verwaltung"]] : []),
     ...(Z.demo ? [["#/funktionen", "", "Was kann die Seite? (Demo)"]] : []),
   ];
   box.innerHTML = `<div class="sheet">
     ${links.map(([h, i, t]) => `<a href="${h}">${t}<span class="pfeil">›</span></a>`).join("")}
     <hr>
-    <button data-m="name">Name ändern</button>
+    <button data-m="name">${Z.rolle === "spieler" || erwachsen() ? "Anderen Spieler wählen" : "Name ändern"}</button>
+    ${modul("push") ? `<button data-m="push">Benachrichtigungen</button>` : ""}
     ${istApp() ? "" : `<button data-m="app">Als App installieren</button>`}
     <button data-m="hilfe">Hilfe</button>
     <a href="#/datenschutz">Datenschutz</a>
@@ -1794,21 +1996,392 @@ function mehrMenue() {
     box.remove();
     if (t.dataset.m === "name" || t.dataset.m === "hilfe") { await willkommen({ nurName: t.dataset.m === "name" }); zeigen(); }
     if (t.dataset.m === "app") await appInstallieren();
+    if (t.dataset.m === "push") await pushDialog();
     if (t.dataset.m === "abmelden") { await fetch("/api/logout", { method: "POST" }); location.href = "/login.html"; }
   });
   document.body.appendChild(box);
 }
 
+// ---------- Training und Spiele: An- und Abmeldung ----------
+const TAGE_NR = { sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
+const plusTage = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const startZeit = (t) => { const m = /(\d{1,2})[:.](\d{2})/.exec(String(t || "")); return m ? `${m[1].padStart(2, "0")}:${m[2]}` : ""; };
+function ausfallFuer(datumIso, slot) {
+  return (Z.trainingsausfall || []).find((a) => a.von && datumIso >= a.von && datumIso <= (a.bis || a.von) && (!a.slot || a.slot === "alle" || a.slot === String(slot)));
+}
+// Termine von heute bis heute + tage (Training aus den Trainingszeiten, dazu alle Spiele)
+function anwesenheitTermine(tage = Z.einstellungen.anwesenheitTage || 14, ab = heute()) {
+  const bis = plusTage(ab, tage);
+  const t = [];
+  for (let d = ab; d <= bis; d = plusTage(d, 1)) {
+    (Z.einstellungen.trainingszeiten || []).forEach((tr, i) => {
+      if (TAGE_NR[String(tr.tag || "").trim().toLowerCase()] !== new Date(d + "T12:00:00Z").getUTCDay()) return;
+      const aus = ausfallFuer(d, i);
+      t.push({ key: `tr-${d}-${i}`, art: "training", datum: d, zeit: startZeit(tr.zeit), zeitText: tr.zeit || "", ort: tr.halle || "", slot: i, titel: "Training", ausfall: aus || null });
+    });
+  }
+  for (const s of Z.spiele) if (s.datum >= ab && s.datum <= bis) t.push({ key: `sp-${s.id}`, art: "spiel", datum: s.datum, zeit: s.zeit || "", ort: s.halle || "", spiel: s, titel: s.heim ? `Heimspiel gegen ${s.gegner}` : `Auswärtsspiel bei ${s.gegner}`, ausfall: null });
+  return t.sort((a, b) => (a.datum + a.zeit).localeCompare(b.datum + b.zeit));
+}
+const trainingModus = () => (Z.einstellungen.anwesenheitTraining === "zusagen" ? "zusagen" : "abmelden");
+function anwStatus(t, spieler) {
+  const e = (Z.anwesenheit || []).find((x) => x.termin === t.key && x.spieler === spieler);
+  if (e) return { status: e.status, eintrag: e, standard: false };
+  if (t.art === "training" && trainingModus() === "abmelden") return { status: "ja", standard: true };
+  return { status: "offen", standard: true };
+}
+function anwZahlen(t) {
+  const z = { ja: [], nein: [], offen: [] };
+  for (const k of kader()) { const st = anwStatus(t, k.vorname); z[st.status].push({ name: k.vorname, ...st }); }
+  return z;
+}
+function terminZeitText(t) {
+  if (t.art === "training") return `${t.zeitText || (t.zeit ? t.zeit + " Uhr" : "")}${t.ort ? " · " + t.ort : ""}`;
+  const tz = treffzeit(t.spiel);
+  return `Anwurf ${t.zeit ? t.zeit + " Uhr" : "folgt"}${tz ? ` · Treffen ${tz} Uhr in der Halle` : ""}${t.ort ? " · " + t.ort : ""}`;
+}
+// Eine Zeile mit Zu- und Absage für einen Spieler
+function anwZeile(t, spieler, { zahlen = true, lesen = false } = {}) {
+  const st = anwStatus(t, spieler);
+  const z = anwZahlen(t);
+  const knopf = (wert, text) => `<button class="anw-knopf ${st.status === wert ? "an " + wert + (st.standard ? " standard" : "") : ""}" data-aktion="anw" data-termin="${t.key}" data-spieler="${esc(spieler)}" data-status="${wert}" ${st.status === wert && st.standard ? 'title="automatisch dabei, solange du dich nicht abmeldest"' : ""}>${text}</button>`;
+  const fahrt = t.art === "spiel" && !t.spiel.heim ? Z.mitfahrer.filter((m) => m.name === spieler).map((m) => Z.fahrten.find((f) => f.id === m.fahrtId && f.spielId === t.spiel.id)).filter(Boolean) : [];
+  return `<li class="anw-zeile ${t.ausfall ? "ausfall" : ""} ${st.status === "offen" ? "offen" : ""}">
+    ${datumBlock(t.datum)}
+    <div class="anw-mitte">
+      <div class="anw-titel">${esc(t.titel)}${t.ausfall ? ` <span class="pill neutral">fällt aus</span>` : st.status === "offen" ? ` <span class="pill offen">bitte melden</span>` : ""}</div>
+      <div class="leise klein">${esc(terminZeitText(t))}</div>
+      ${t.ausfall ? `<div class="klein">${esc(t.ausfall.grund || "Das Training fällt aus.")}</div>` : ""}
+      ${fahrt.map((f) => `<div class="klein">🚗 fährt bei ${esc(anzeigeName(f.fahrer))} mit${f.treffpunkt ? ", Abfahrt " + esc(abfahrtText(f.treffpunkt)) : ""}${richtungText(f) ? ` (${richtungText(f)})` : ""}</div>`).join("")}
+      ${st.eintrag?.bemerkung ? `<div class="klein">„${esc(st.eintrag.bemerkung)}“</div>` : ""}
+      ${zahlen && !t.ausfall ? `<details class="anw-wer"><summary class="leise klein">${z.ja.length} dabei · ${z.nein.length} abgemeldet${z.offen.length ? ` · ${z.offen.length} offen` : ""}</summary>
+        <p class="klein"><strong>Dabei:</strong> ${esc(z.ja.map((x) => x.name).join(", ") || "noch niemand")}</p>
+        ${z.nein.length ? `<p class="klein"><strong>Abgemeldet:</strong> ${esc(z.nein.map((x) => x.name).join(", "))}</p>` : ""}</details>` : ""}
+    </div>
+    ${t.ausfall ? "" : lesen ? `<div class="anw-knoepfe">${st.status === "ja" ? `<span class="pill ok">${st.standard ? "dabei (nicht abgemeldet)" : "hat zugesagt"}</span>` : st.status === "nein" ? `<span class="pill neutral">abgemeldet</span>` : `<span class="pill offen">noch nicht gemeldet</span>`}</div>`
+      : `<div class="anw-knoepfe">${knopf("ja", "Dabei")}${knopf("nein", "Kann nicht")}</div>`}
+  </li>`;
+}
+function anwListe(spieler, termine, lesen = false) {
+  return termine.length ? `<ul class="anw-liste">${termine.map((t) => anwZeile(t, spieler, { lesen })).join("")}</ul>` : `<p class="leer">In den nächsten Tagen stehen keine Termine an.</p>`;
+}
+const anwHinweis = () => trainingModus() === "abmelden"
+  ? "Beim Training gilt: Wer sich nicht abmeldet, ist dabei. Bei Spielen bitte immer zu- oder absagen."
+  : "Bitte bei Training und Spielen immer zu- oder absagen.";
+
+function seiteSpielerStart() {
+  const kind = meinKind();
+  const infos = modul("infos") && aktiveHinweise().length ? `<section class="karte infos-start"><div class="karte-kopf"><h2 style="margin:0">Vom Trainerteam</h2></div>${hinweiseKarte(true)}</section>` : "";
+  if (!kind) return `<p class="unterzeile">Willkommen</p><h1>Training und Spiele</h1>
+    <section class="karte sohn-fehlt"><div><strong>Wer bist du?</strong><div class="leise klein">Einmal deinen Namen auswählen, dann kannst du dich an- und abmelden.</div></div>
+    <button class="knopf klein" data-aktion="name-aendern">Auswählen</button></section>${infos}`;
+  const termine = anwesenheitTermine();
+  const offen = termine.filter((t) => !t.ausfall && anwStatus(t, kind).status === "offen").length;
+  return `<p class="unterzeile">Hallo ${esc(kind)}</p><h1>Training und Spiele</h1>
+    ${installKarte()}
+    ${pushKarte()}
+    ${infos}
+    <section class="karte">
+      <div class="karte-kopf"><h2 style="margin:0">Deine nächsten Termine</h2>${offen ? `<span class="pill offen">${offen} offen</span>` : `<span class="pill ok">✓ alles gemeldet</span>`}</div>
+      <p class="leise klein">${anwHinweis()}</p>
+      ${anwListe(kind, termine)}
+    </section>
+    ${kalenderAboKarte()}`;
+}
+
+function seiteAnwesenheit() {
+  if (istTrainer()) return seiteAnwesenheitTrainer();
+  const kind = meinKind();
+  if (erwachsen()) return `${kopfzeile("Zu- und absagen", "Training und Spiele")}
+    ${kind ? `<section class="karte"><p class="leise klein">${anwHinweis()}</p>${anwListe(kind, anwesenheitTermine())}</section>`
+      : `<p class="hinweis">Bitte zuerst auswählen, wer du bist. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`}`;
+  return `${kopfzeile("An- und abmelden", "Training und Spiele")}
+    ${kind ? `<section class="karte"><h2>${esc(kind)}</h2><p class="leise klein">Zu- und Absagen macht ${esc(kind)} selbst mit dem Spieler-Zugang. Hier siehst du, wie er sich gemeldet hat. ${anwHinweis()}</p>${anwListe(kind, anwesenheitTermine(), true)}</section>`
+      : `<p class="hinweis">Bitte zuerst deinen Sohn auswählen. <button class="link-knopf" data-aktion="name-aendern">Jetzt auswählen</button></p>`}`;
+}
+
+function seiteAnwesenheitTrainer() {
+  const termine = anwesenheitTermine();
+  const tz = Z.einstellungen.trainingszeiten || [];
+  const naechster = termine.find((t) => !t.ausfall);
+  const karte = (t) => {
+    const z = anwZahlen(t);
+    const name = (x, status) => `<button class="anw-name ${status}" data-aktion="anw-trainer" data-termin="${t.key}" data-spieler="${esc(x.name)}" data-status="${status}" title="antippen zum Ändern">${esc(x.name)}${x.standard && status === "ja" ? "" : ""}</button>`;
+    const bem = z.nein.concat(z.ja).filter((x) => x.eintrag?.bemerkung);
+    return `<details class="karte anw-karte" ${naechster && t.key === naechster.key ? "open" : ""}>
+      <summary><div class="summary-innen"><div class="spiel">${datumBlock(t.datum)}<div><div class="spiel-titel">${esc(t.titel)}</div><div class="leise klein">${esc(terminZeitText(t))}</div></div></div>
+        <div class="summary-status">${t.ausfall ? `<span class="pill neutral">fällt aus</span>` : `<span class="pill ok">${z.ja.length} dabei</span> ${z.nein.length ? `<span class="pill neutral">${z.nein.length} ab</span>` : ""} ${z.offen.length ? `<span class="pill offen">${z.offen.length} offen</span>` : ""}`}</div></div></summary>
+      <div class="abstand">
+        ${t.ausfall ? `<p>${esc(t.ausfall.grund || "Das Training fällt aus.")}</p>
+          ${t.ausfall.von === (t.ausfall.bis || t.ausfall.von) ? `<button class="knopf klein zweit" data-aktion="loeschen" data-col="trainingsausfall" data-id="${t.ausfall.id}" data-frage="Training findet doch statt?">Findet doch statt</button>` : `<p class="leise klein">Teil des Ausfalls vom ${kurzDatum(t.ausfall.von)} bis ${kurzDatum(t.ausfall.bis)}. Ändern unten bei „Ausfälle“.</p>`}`
+        : `<p class="leise klein">Name antippen, um ihn umzustellen (zum Beispiel nach einer Nachricht in WhatsApp).</p>
+          <div class="anw-gruppe"><strong>Dabei (${z.ja.length})</strong><div>${z.ja.map((x) => name(x, "ja")).join("") || `<span class="leise">niemand</span>`}</div></div>
+          <div class="anw-gruppe"><strong>Abgemeldet (${z.nein.length})</strong><div>${z.nein.map((x) => name(x, "nein")).join("") || `<span class="leise">niemand</span>`}</div></div>
+          ${z.offen.length ? `<div class="anw-gruppe"><strong>Noch keine Rückmeldung (${z.offen.length})</strong><div>${z.offen.map((x) => name(x, "offen")).join("")}</div></div>` : ""}
+          ${bem.length ? `<ul class="klein anw-bem">${bem.map((x) => `<li><strong>${esc(x.name)}:</strong> ${esc(x.eintrag.bemerkung)}</li>`).join("")}</ul>` : ""}
+          <div class="ausrichten abstand">
+            <button class="knopf klein zweit" data-aktion="anw-whatsapp" data-termin="${t.key}">Für WhatsApp kopieren</button>
+            ${t.art === "training" ? `<button class="link-knopf gefahr-text" data-aktion="ausfall-tag" data-datum="${t.datum}" data-slot="${t.slot}">Training fällt aus</button>` : ""}
+          </div>`}
+      </div></details>`;
+  };
+  const ausfaelle = [...(Z.trainingsausfall || [])].filter((a) => (a.bis || a.von) >= heute()).sort((a, b) => a.von.localeCompare(b.von));
+  return `${kopfzeile("Für das Trainerteam", "Anwesenheit")}
+    <p class="leise klein">${anwHinweis()} ${erwachsen() ? "Die Spieler melden sich selbst. Du kannst Meldungen korrigieren. " : "Die Jungs melden sich mit dem Spieler-Zugang selbst. Du kannst Meldungen korrigieren, Eltern sehen nur den Stand ihres Sohns. "}${Z.spielerZugang === false ? "<strong>Der Spieler-Zugang ist noch nicht eingerichtet (Passwort in Netlify fehlt).</strong>" : ""}</p>
+    ${termine.length ? termine.map((t, i) => `<div class="${i ? "abstand" : ""}">${karte(t)}</div>`).join("") : `<section class="karte"><p class="leer">Keine Termine in den nächsten ${Z.einstellungen.anwesenheitTage || 14} Tagen. Trainingszeiten stehen in der Verwaltung.</p></section>`}
+    <h2 class="bereich-titel">Ausfälle</h2>
+    <section class="karte">
+      ${ausfaelle.length ? `<ul class="liste">${ausfaelle.map((a) => `<li><span><strong>${a.bis && a.bis !== a.von ? `${kurzDatum(a.von)} bis ${kurzDatum(a.bis)}` : `${wochentagKurz(a.von)} ${kurzDatum(a.von)}`}</strong> · ${a.slot && a.slot !== "alle" ? esc(tz[Number(a.slot)]?.tag || "Training") : "alle Trainings"}${a.grund ? `<div class="leise klein">${esc(a.grund)}</div>` : ""}</span>
+        <button class="link-knopf gefahr-text" data-aktion="loeschen" data-col="trainingsausfall" data-id="${a.id}" data-frage="Ausfall löschen? Das Training findet dann wieder statt.">löschen</button></li>`).join("")}</ul>` : `<p class="leise">Kein Training fällt aus.</p>`}
+      <details class="abstand"><summary>Ausfall eintragen (z. B. Ferien)</summary>
+        <form class="zeile abstand" data-form="ausfall">
+          <div class="feld" style="flex-basis:150px"><label>von</label><input type="date" name="von" required value="${heute()}"></div>
+          <div class="feld" style="flex-basis:150px"><label>bis</label><input type="date" name="bis"></div>
+          <div class="feld" style="flex-basis:160px"><label>Welches Training</label><select name="slot"><option value="alle">alle</option>${tz.map((t, i) => `<option value="${i}">${esc(t.tag)}</option>`).join("")}</select></div>
+          <div class="feld" style="flex-basis:220px"><label>Grund</label><input type="text" name="grund" maxlength="120" placeholder="z. B. Herbstferien, Halle belegt"></div>
+          <button class="knopf">Eintragen</button>
+        </form>
+        <p class="leise klein">Alle mit eingeschalteten Benachrichtigungen bekommen sofort eine Nachricht.</p>
+      </details>
+    </section>`;
+}
+
+function anwWhatsapp(key) {
+  const t = anwesenheitTermine(60, plusTage(heute(), -1)).find((x) => x.key === key);
+  if (!t) return "";
+  const z = anwZahlen(t);
+  const d = datumLang(t.datum);
+  const zeilen = [`🏐 ${t.titel}, ${d}${t.zeit ? " · " + t.zeit + " Uhr" : ""}`, ""];
+  zeilen.push(`✅ Dabei (${z.ja.length}): ${z.ja.map((x) => x.name).join(", ") || "noch niemand"}`);
+  if (z.nein.length) zeilen.push(`❌ Abgemeldet (${z.nein.length}): ${z.nein.map((x) => x.name).join(", ")}`);
+  if (z.offen.length) zeilen.push(`❓ Noch keine Rückmeldung: ${z.offen.map((x) => x.name).join(", ")}`);
+  zeilen.push("", `Bitte zu- oder absagen: ${location.origin}`);
+  return zeilen.join("\n");
+}
+
+// ---------- Push-Benachrichtigungen ----------
+const pushMoeglich = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const pushAn = () => lokal("otv_push") === "1";
+function b64zuBytes(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function pushAbo() {
+  if (!pushMoeglich()) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function pushMelden(sub) {
+  await api("POST", "/api/push/abo", { subscription: sub.toJSON(), kind: meinKind(), name: meinName() });
+}
+async function pushEinschalten() {
+  if (istIOS() && !istApp()) {
+    meldung("Auf dem iPhone geht das nur, wenn die Seite als App auf dem Startbildschirm liegt.", true);
+    await appInstallieren();
+    return false;
+  }
+  if (!pushMoeglich()) throw new Error("Dieses Gerät oder dieser Browser kann leider keine Benachrichtigungen empfangen.");
+  const erlaubt = await Notification.requestPermission();
+  if (erlaubt !== "granted") throw new Error("Benachrichtigungen wurden nicht erlaubt. Das lässt sich in den Einstellungen des Handys bei dieser App ändern.");
+  const { publicKey } = await api("GET", "/api/push/schluessel");
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64zuBytes(publicKey) });
+  await pushMelden(sub);
+  lokal("otv_push", "1");
+  return true;
+}
+async function pushAusschalten() {
+  const sub = await pushAbo().catch(() => null);
+  if (sub) { await api("DELETE", "/api/push/abo", { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+  lokal("otv_push", "0");
+}
+// Beim Start Abo still auffrischen (z. B. nach Rollen- oder Namenswechsel)
+async function pushAuffrischen() {
+  if (!pushAn()) return;
+  try { const sub = await pushAbo(); if (sub) await pushMelden(sub); else lokal("otv_push", "0"); } catch { /* egal */ }
+}
+function pushKarte() {
+  if (!modul("push") || pushAn() || lokal("otv_push_weg") || (!pushMoeglich() && !istIOS())) return "";
+  const aufgaben = [modul("standdienst") && "Standdienst, Kuchen", modul("dienste") && "Helferdienste", modul("fahrten") && "Fahrten", modul("zeitnehmer") && "Zeitnehmer"].filter(Boolean).join(", ");
+  const text = nurSpielerSicht() ? "Du bekommst eine Nachricht, wenn du dich für ein Spiel noch melden musst oder ein Training ausfällt."
+    : `${aufgaben ? `Am Vortag eine Erinnerung an ${aufgaben}. ` : ""}Dazu wichtige Infos vom Trainerteam${modul("dienste") ? " und ein Hinweis, wenn du bei einem Dienst an der Reihe wärst" : ""}.`;
+  return `<section class="karte install-karte push-karte">
+    <div><strong>🔔 Erinnerungen aufs Handy</strong><div class="leise klein">${text}</div></div>
+    <div class="ausrichten"><button class="knopf klein" data-aktion="push-an">Einschalten</button>
+      <button class="link-knopf" data-aktion="push-weg">später</button></div>
+  </section>`;
+}
+async function pushDialog() {
+  const box = document.createElement("div");
+  box.className = "lightbox";
+  const an = pushAn();
+  box.innerHTML = `<div class="dialog-box">
+    <h2>Benachrichtigungen</h2>
+    <p>${an ? "Auf diesem Handy sind Erinnerungen <strong>eingeschaltet</strong>." : "Auf diesem Handy sind Erinnerungen <strong>aus</strong>."}</p>
+    <ul class="punkte-liste klein">${nurSpielerSicht()
+      ? "<li>Erinnerung, wenn du dich für ein Spiel noch nicht gemeldet hast</li><li>Training fällt aus</li><li>Infos vom Trainerteam</li>"
+      : `<li>Am Vortag: deine Aufgaben fürs Spiel (${[modul("standdienst") && "Standdienst, Kuchen", modul("dienste") && "Helferdienste", modul("fahrten") && "Fahrten", modul("zeitnehmer") && "Zeitnehmer", modul("waesche") && "Wäsche"].filter(Boolean).join(", ") || "Spiel"})</li><li>Zwei Tage vorher: was beim Spiel noch fehlt</li>${modul("dienste") ? "<li>Wenn du bei einem offenen Dienst an der Reihe wärst</li>" : ""}${erwachsen() && modul("anwesenheit") ? "<li>Wenn du dich für ein Spiel noch nicht gemeldet hast</li>" : ""}<li>Infos vom Trainerteam, Training fällt aus</li>`}</ul>
+    ${istIOS() && !istApp() ? `<p class="hinweis klein">Auf dem iPhone bitte zuerst die Seite als App auf den Startbildschirm legen und von dort öffnen (ab iOS 16.4).</p>` : ""}
+    <div class="ausrichten abstand" style="margin-top:14px">
+      ${an ? `<button class="knopf" data-p="test">Test senden</button><button class="knopf zweit" data-p="aus">Ausschalten</button>` : `<button class="knopf" data-p="an">Einschalten</button>`}
+      <button class="link-knopf" data-p="zu">Schließen</button></div></div>`;
+  box.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-p]");
+    if (e.target === box || b?.dataset.p === "zu") return box.remove();
+    if (!b) return;
+    try {
+      b.disabled = true;
+      if (b.dataset.p === "an") { if (await pushEinschalten()) meldung("Erinnerungen sind eingeschaltet"); }
+      if (b.dataset.p === "aus") { await pushAusschalten(); meldung("Erinnerungen sind aus"); }
+      if (b.dataset.p === "test") {
+        const sub = await pushAbo();
+        if (!sub) throw new Error("Auf diesem Gerät ist kein Abo mehr aktiv. Bitte aus- und wieder einschalten.");
+        const r = await api("POST", "/api/push/test", { endpoint: sub.endpoint });
+        meldung(r.gesendet ? "Test gesendet, kommt gleich an" : "Senden hat nicht geklappt. Bitte aus- und wieder einschalten.", !r.gesendet);
+      }
+      box.remove(); zeigen();
+    } catch (err) { b.disabled = false; meldung(err.message, true); }
+  });
+  document.body.appendChild(box);
+}
+
+// ---------- Fahrten: Hin- und Rückfahrt, Umsteigen, Fahrt gesucht ----------
+const RICHTUNG = { hin: "nur Hinfahrt", rueck: "nur Rückfahrt" };
+const richtungText = (f) => RICHTUNG[f.richtung] || "";
+const strecken = (r) => (r === "hin" ? ["hin"] : r === "rueck" ? ["rueck"] : ["hin", "rueck"]);
+// Sitzt name bei diesem Spiel schon für eine der Strecken von fahrt in einem anderen Auto?
+function fahrtKonflikt(name, fahrt, ausser = null) {
+  const ziel = strecken(fahrt.richtung);
+  return Z.mitfahrer.some((m) => m.name === name && m.id !== ausser && (() => { const f = Z.fahrten.find((x) => x.id === m.fahrtId && x.spielId === fahrt.spielId); return f && strecken(f.richtung).some((r) => ziel.includes(r)); })());
+}
+function bedarfVon(s) { return (Z.fahrtbedarf || []).filter((b) => b.spielId === s.id); }
+const bedarfText = (b) => `${b.spieler}${b.richtung === "hin" ? " (Hinfahrt)" : b.richtung === "rueck" ? " (Rückfahrt)" : ""}`;
+function umsteigenDialog(m) {
+  const alt = Z.fahrten.find((f) => f.id === m.fahrtId);
+  const ziele = Z.fahrten.filter((f) => f.spielId === alt.spielId && f.id !== alt.id && Z.mitfahrer.filter((x) => x.fahrtId === f.id).length < f.plaetze && !fahrtKonflikt(m.name, f, m.id));
+  if (!ziele.length) return meldung("Es gibt gerade kein anderes Auto mit freiem Platz für diese Strecke.", true);
+  return new Promise((fertig) => {
+    const box = document.createElement("div");
+    box.className = "lightbox";
+    box.innerHTML = `<div class="dialog-box"><h2>${esc(m.name)} umsteigen</h2><p class="leise">In welches Auto soll ${esc(m.name)} wechseln?</p>
+      <div class="hero-knoepfe">${ziele.map((f) => `<button class="knopf zweit gross" data-ziel="${f.id}">${esc(anzeigeName(f.fahrer))}<small>${f.plaetze - Z.mitfahrer.filter((x) => x.fahrtId === f.id).length} frei${richtungText(f) ? " · " + richtungText(f) : ""}${f.treffpunkt ? " · " + esc(abfahrtText(f.treffpunkt)) : ""}</small></button>`).join("")}</div>
+      <button class="link-knopf abstand" data-ziel="">abbrechen</button></div>`;
+    box.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-ziel]");
+      if (e.target !== box && !b) return;
+      box.remove();
+      if (!b || !b.dataset.ziel) return fertig();
+      try {
+        await api("PUT", "/api/c/mitfahrer/" + m.id, { fahrtId: b.dataset.ziel });
+        offeneSpiele?.add(alt.spielId);
+        await neuLaden(`${m.name} fährt jetzt bei ${anzeigeName(Z.fahrten.find((f) => f.id === b.dataset.ziel)?.fahrer || "")} mit`);
+      } catch (err) { meldung(err.message, true); }
+      fertig();
+    });
+    document.body.appendChild(box);
+  });
+}
+
+// ---------- Helferdienste (z. B. Hallenaufbau) ----------
+const dienstArten = () => (modul("dienste") ? Z.einstellungen.dienstArten || [] : []);
+const dienstVon = (s, art) => (Z.dienste || []).filter((d) => d.spielId === s.id && d.dienst === art.name);
+// Uhrzeit des Dienstes: Minuten vor Anwurf, -1 = nach dem Spiel
+function dienstZeitText(s, art, kurz = false) {
+  if (art.vorlauf < 0) return kurz ? " nach dem Spiel" : "nach dem Spiel";
+  if (!s.zeit || !art.vorlauf) return "";
+  const [h, m] = s.zeit.split(":").map(Number);
+  const t = (h * 60 + m - art.vorlauf + 1440) % 1440;
+  const uhr = `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  return kurz ? `, ab ${uhr} Uhr` : `ab ${uhr} Uhr`;
+}
+// Wer zählt als "ich" bei den Diensten? Erwachsene: man selbst, Jugend: die Familie (Vorname des Sohns)
+const dienstPerson = () => meinKind() || (erwachsen() ? meinVorname() : "");
+function dienstZaehlerC() {
+  const z = new Map();
+  for (const d of Z.dienste || []) {
+    const sp = Z.spiele.find((s) => s.id === d.spielId);
+    if (!sp || !d.person) continue;
+    const e = z.get(d.person) || { geleistet: 0, geplant: 0, zuletzt: "" };
+    if (sp.datum < heute()) { e.geleistet++; if (sp.datum > e.zuletzt) e.zuletzt = sp.datum; } else e.geplant++;
+    z.set(d.person, e);
+  }
+  return z;
+}
+// Gleiche Regel wie in netlify/shared/dienste.js: offene Plätze an die, die bisher am seltensten dran waren
+function dienstVorschlaegeC(s) {
+  const tage = Z.einstellungen.dienstVorschlagTage ?? 3;
+  if ((datum(s.datum) - datum(heute())) / 864e5 > tage || s.datum < heute()) return {};
+  const zaehler = dienstZaehlerC();
+  const imSpiel = new Set((Z.dienste || []).filter((d) => d.spielId === s.id).map((d) => d.person).filter(Boolean));
+  const ab = new Set(modul("anwesenheit") ? (Z.anwesenheit || []).filter((a) => a.termin === `sp-${s.id}` && a.status === "nein").map((a) => a.spieler) : []);
+  const leer = { geleistet: 0, geplant: 0, zuletzt: "" };
+  const kand = kader().map((k) => k.vorname).filter((n) => !imSpiel.has(n) && !ab.has(n)).sort((a, b) => {
+    const za = zaehler.get(a) || leer, zb = zaehler.get(b) || leer;
+    return (za.geleistet + za.geplant) - (zb.geleistet + zb.geplant) || za.zuletzt.localeCompare(zb.zuletzt) || a.localeCompare(b, "de");
+  });
+  const v = {};
+  for (const art of dienstArten()) {
+    const offen = art.personen - dienstVon(s, art).length;
+    v[art.name] = offen > 0 ? kand.splice(0, offen) : [];
+  }
+  return v;
+}
+function dienstAufgaben(s) {
+  if (!s.heim || !dienstArten().length) return [];
+  const vorschlag = dienstVorschlaegeC(s);
+  const ich = dienstPerson();
+  const bald = (datum(s.datum) - datum(heute())) / 864e5 <= 3;
+  return dienstArten().map((art) => {
+    const wer = dienstVon(s, art);
+    const frei = art.personen - wer.length;
+    const meins = wer.find((d) => d.eigen || (ich && d.person === ich));
+    const v = vorschlag[art.name] || [];
+    const namen = wer.map((d) => `${esc(erwachsen() ? d.person || anzeigeName(d.name) : anzeigeName(d.name))}${istTrainer() || d.eigen ? ` <button class="x-klein" title="austragen" data-aktion="loeschen" data-col="dienste" data-id="${d.id}" data-frage="${esc(d.person || d.name)} bei ${esc(art.name)} austragen?">×</button>` : ""}`).join(", ");
+    const zuweisen = istTrainer() && frei > 0 && s.datum >= heute() ? ` <select class="zuweisen" data-aktion="dienst-zuweisen" data-spiel="${s.id}" data-dienst="${esc(art.name)}" aria-label="Spieler eintragen"><option value="">eintragen …</option>${kader().map((k) => k.vorname).filter((n) => !wer.some((d) => d.person === n)).map((n) => `<option>${esc(n)}</option>`).join("")}</select>` : "";
+    return {
+      status: frei > 0 ? (bald ? "dringend" : "offen") : "ok", titel: art.name, kurz: art.name.split(" ")[0],
+      stand: `${wer.length} von ${art.personen}`,
+      detail: [dienstZeitText(s, art), namen].filter(Boolean).join(" · ")
+        + (frei > 0 && v.length ? `<div class="vorschlag">Vorschlag: ${esc(v.join(", "))} <span class="leise">(bisher am seltensten dran)</span></div>` : "") + zuweisen,
+      knopf: meins ? "" : frei > 0 && s.datum >= heute() ? `<button class="knopf klein ${v.includes(ich) ? "" : "zweit"}" data-aktion="dienst-ich" data-spiel="${s.id}" data-dienst="${esc(art.name)}">Ich übernehme</button>` : "",
+    };
+  });
+}
+function dienstFairnessKarte() {
+  if (!dienstArten().length) return "";
+  const z = dienstZaehlerC();
+  const leer = { geleistet: 0, geplant: 0, zuletzt: "" };
+  const zeilen = kader().map((k) => ({ n: k.vorname, ...(z.get(k.vorname) || leer) })).sort((a, b) => (a.geleistet - b.geleistet) || a.n.localeCompare(b.n, "de"));
+  const max = Math.max(1, ...zeilen.map((x) => x.geleistet));
+  const ich = dienstPerson();
+  return `<details class="karte formular-klappe fairness"><summary>Helferdienste: wer war wie oft dran?</summary><div class="abstand">
+    <p class="leise klein">Gezählt werden die Dienste bei vergangenen Heimspielen dieser Saison. Wer selten dran war, steht oben und wird bei offenen Diensten ${Z.einstellungen.dienstVorschlagTage ?? 3} Tage vorher vorgeschlagen.</p>
+    <ul class="fairness-liste">${zeilen.map((x) => `<li class="${x.n === ich ? "ich" : ""}"><span class="fn">${esc(x.n)}${x.n === ich ? ` <span class="leise">(${erwachsen() ? "du" : "ihr"})</span>` : ""}</span>
+      <span class="balken"><span style="width:${Math.round((x.geleistet / max) * 100)}%"></span></span><span class="zahl">${x.geleistet}×${x.geplant ? ` <span class="leise">+${x.geplant}</span>` : ""}</span></li>`).join("")}</ul>
+    <p class="leise klein">+ = schon für kommende Spiele eingetragen.</p></div></details>`;
+}
+// Erwachsene: kompakte Zu- und Absage auf der Startseite
+function anwesenheitStartKarte() {
+  if (!erwachsen() || !modul("anwesenheit") || !meinKind()) return "";
+  const termine = anwesenheitTermine(7).slice(0, 3);
+  if (!termine.length) return "";
+  return `<section class="karte anw-start"><div class="karte-kopf"><h2 style="margin:0">Training und Spiele</h2><a class="klein" href="#/anwesenheit">alle ›</a></div>
+    <ul class="anw-liste">${termine.map((t) => anwZeile(t, meinKind(), { zahlen: false })).join("")}</ul></section>`;
+}
+
 // ---------- Router ----------
 function zeigen() {
   const pfad = location.hash.replace(/^#\/?/, "").split("?")[0];
-  const seite = SEITEN[pfad] || seiteStart;
+  const seite = nurSpielerSicht() ? (SPIELER_SEITEN[pfad] || seiteSpielerStart) : (SEITEN[pfad] || seiteStart);
   inhalt.innerHTML = seite();
   const abr = inhalt.querySelector('form[data-form="abrechnung"]');
   if (abr) abrechnungRechnen(abr);
   const nav = { catering: "spiele", fahrten: "spiele", termine: "infos" }[pfad] ?? pfad;
   document.querySelectorAll(".nav a, .unten-nav a").forEach((a) => a.classList.toggle("aktiv", a.getAttribute("href") === "#/" + nav));
-  $("#unten-mehr").classList.toggle("aktiv", !["", "spiele", "infos", "kasse"].includes(nav));
+  $("#unten-mehr").classList.toggle("aktiv", !["", "spiele", "infos", "kasse", ...(nurSpielerSicht() ? ["mannschaft"] : [])].includes(nav));
+  navAnpassen();
   kopfAktualisieren();
   if (pfad === "spiele" && Z.einstellungen.widgetToken) widgetsLaden();
 }
@@ -1868,8 +2441,17 @@ inhalt.addEventListener("submit", async (ev) => {
         await neuLaden("Danke für die Zusage"); break;
       }
       case "hinweis":
-        await api("POST", "/api/c/hinweise", { text: w.text, bis: w.bis, von: meinVorname() || (Z.rolle === "trainer" ? "Trainerteam" : "") });
-        await neuLaden("Info veröffentlicht"); break;
+        await api("POST", "/api/c/hinweise", { text: w.text, bis: w.bis, von: meinVorname() || (Z.rolle === "trainer" ? "Trainerteam" : ""), push: w.push === "on" });
+        await neuLaden(w.push === "on" ? "Info veröffentlicht und als Push verschickt" : "Info veröffentlicht"); break;
+      case "ausfall":
+        if (w.bis && w.bis < w.von) throw new Error("„bis“ liegt vor „von“");
+        await api("POST", "/api/c/trainingsausfall", { von: w.von, bis: w.bis || w.von, slot: w.slot, grund: w.grund });
+        await neuLaden("Ausfall eingetragen"); break;
+      case "fahrtbedarf":
+        if (!w.spieler) throw new Error("Bitte einen Spieler auswählen");
+        await api("POST", "/api/c/fahrtbedarf", { spielId: form.dataset.spiel, spieler: w.spieler, richtung: w.richtung, von: meinName() });
+        offeneSpiele?.add(form.dataset.spiel);
+        await neuLaden("Eingetragen: Fahrt gesucht"); break;
       case "name-zuordnen": {
         const zuordnung = { ...(Z.einstellungen.namenZuordnung || {}), [w.name.trim().toLowerCase()]: w.sohn };
         await api("PUT", "/api/einstellungen", { namenZuordnung: zuordnung });
@@ -1893,7 +2475,7 @@ inhalt.addEventListener("submit", async (ev) => {
         await neuLaden("Danke, Antwort gespeichert"); break;
       }
       case "antwort": {
-        if (!meinKind()) throw new Error("Bitte zuerst deinen Sohn auswählen");
+        if (!meinKind()) throw new Error(erwachsen() ? "Bitte zuerst auswählen, wer du bist" : "Bitte zuerst deinen Sohn auswählen");
         const id = `${form.dataset.termin}-${slug(meinKind())}`;
         await api("PUT", "/api/c/antworten/" + id, { terminId: form.dataset.termin, familie: meinKind(), kommt: true, personen: Number(w.personen) || 0, von: meinName() });
         await neuLaden("Danke für deine Rückmeldung"); break;
@@ -1901,7 +2483,11 @@ inhalt.addEventListener("submit", async (ev) => {
       case "termin": {
         const kosten = w.kosten.trim() ? inCent(w.kosten) : 0;
         if (!Number.isFinite(kosten) || kosten < 0) throw new Error("Kosten bitte im Format 5,00 eingeben");
-        const daten = { titel: w.titel, datum: w.datum, zeit: w.zeit, ort: w.ort, beschreibung: w.beschreibung, frage: w.frage, kostenProPerson: kosten, frist: w.frist || "" };
+        const anzahlung = w.anzahlung.trim() ? inCent(w.anzahlung) : 0;
+        if (!Number.isFinite(anzahlung) || anzahlung < 0) throw new Error("Anzahlung bitte im Format 50,00 eingeben");
+        if (w.bis && w.bis < w.datum) throw new Error("„bis“ liegt vor dem Beginn");
+        const daten = { titel: w.titel, datum: w.datum, bis: w.bis || "", zeit: w.zeit, ort: w.ort, beschreibung: w.beschreibung, frage: w.frage, kostenProPerson: kosten, kostenFuer: w.kostenFuer,
+          anzahlung, anzahlungBis: w.anzahlungBis || "", frist: w.frist || "" };
         if (form.dataset.id) await api("PUT", "/api/c/termine/" + form.dataset.id, daten);
         else await api("POST", "/api/c/termine", daten);
         await neuLaden("Termin gespeichert"); break;
@@ -1989,6 +2575,15 @@ inhalt.addEventListener("submit", async (ev) => {
           kassenKategorien: zeilen(w.kassenKategorien),
           kassenKanaele: zeilen(w.kassenKanaele),
           widgetToken: w.widgetToken.trim(),
+          anwesenheitTraining: w.anwesenheitTraining,
+          mannschaftstyp: w.mannschaftstyp,
+          mannschaftName: w.mannschaftName,
+          vereinName: w.vereinName,
+          module: Object.fromEntries(MODULE.map(([k]) => [k, w["mod:" + k] === "on"])),
+          dienstArten: zeilen(w.dienstArten).map((z) => { const [name, personen, wann] = z.split("|").map((x) => (x || "").trim()); return { name, personen: parseInt(personen, 10) || 1, vorlauf: /danach|nach/i.test(wann || "") ? -1 : parseInt(wann, 10) || 0 }; }).filter((d) => d.name),
+          dienstVorschlagTage: w.dienstVorschlagTage,
+          anwesenheitTage: w.anwesenheitTage,
+          pushOffeneAufgaben: w.pushOffeneAufgaben === "on",
           handballNetUrl: w.handballNetUrl.trim(),
         };
         if (!Number.isFinite(daten.anfangsbestand)) throw new Error("Anfangsbestand ungültig");
@@ -2010,7 +2605,52 @@ inhalt.addEventListener("click", async (ev) => {
   if (!el || el.tagName === "SELECT" || el.type === "checkbox") return;
   const a = el.dataset.aktion;
   try {
-    if (a === "loeschen") {
+    if (a === "anw" || a === "anw-trainer") {
+      let status = el.dataset.status;
+      const spieler = el.dataset.spieler;
+      const termin = el.dataset.termin;
+      if (a === "anw-trainer") status = status === "ja" ? "nein" : "ja";
+      let bemerkung = "";
+      if (a === "anw" && status === "nein") {
+        const alt = (Z.anwesenheit || []).find((x) => x.termin === termin && x.spieler === spieler);
+        const b = prompt("Kurzer Hinweis fürs Trainerteam? (optional, z. B. Klassenfahrt)", alt?.bemerkung || "");
+        if (b === null) return;
+        bemerkung = b.trim().slice(0, 80);
+      }
+      el.disabled = true;
+      const von = Z.rolle === "spieler" || erwachsen() && spieler === meinKind() ? spieler : a === "anw-trainer" ? (meinVorname() ? `${meinVorname()} (Trainer)` : "Trainer") : meinName();
+      await api("PUT", `/api/c/anwesenheit/${termin}-${slug(spieler)}`, { termin, spieler, status, bemerkung, von });
+      await neuLaden(status === "ja" ? `${spieler}: dabei` : `${spieler}: abgemeldet`);
+    } else if (a === "dienst-ich") {
+      const person = dienstPerson();
+      if (!person) { await willkommen({ nurName: true }); if (!dienstPerson()) throw new Error(erwachsen() ? "Bitte zuerst auswählen, wer du bist" : "Bitte zuerst deinen Sohn auswählen, damit der Dienst eurer Familie zählt"); }
+      const name = erwachsen() ? dienstPerson() : await nameSicherstellen();
+      el.disabled = true;
+      offeneSpiele?.add(el.dataset.spiel);
+      await api("POST", "/api/c/dienste", { spielId: el.dataset.spiel, dienst: el.dataset.dienst, name, person: dienstPerson(), eingetragenVon: meinName() });
+      await neuLaden(`Danke! Du bist für ${el.dataset.dienst} eingetragen`);
+    } else if (a === "ausfall-tag") {
+      const grund = prompt("Training fällt aus. Grund (optional):", "");
+      if (grund === null) return;
+      await api("POST", "/api/c/trainingsausfall", { von: el.dataset.datum, bis: el.dataset.datum, slot: el.dataset.slot, grund: grund.trim() });
+      await neuLaden("Ausfall eingetragen");
+    } else if (a === "anw-whatsapp") {
+      teilen(anwWhatsapp(el.dataset.termin));
+    } else if (a === "push-an") {
+      el.disabled = true;
+      if (await pushEinschalten()) { meldung("Erinnerungen sind eingeschaltet 👍"); zeigen(); } else el.disabled = false;
+    } else if (a === "push-weg") {
+      lokal("otv_push_weg", "1"); zeigen();
+    } else if (a === "umsteigen") {
+      const m = Z.mitfahrer.find((x) => x.id === el.dataset.id);
+      if (m) await umsteigenDialog(m);
+    } else if (a === "mitnehmen") {
+      const b = (Z.fahrtbedarf || []).find((x) => x.id === el.dataset.id);
+      el.disabled = true;
+      offeneSpiele?.add(b.spielId);
+      await api("POST", "/api/c/mitfahrer", { fahrtId: el.dataset.fahrt, name: b.spieler, eingetragenVon: meinName() });
+      await neuLaden(`Danke! ${b.spieler} fährt bei dir mit`);
+    } else if (a === "loeschen") {
       if (el.dataset.frage && !confirm(el.dataset.frage)) return;
       const r = await api("DELETE", `/api/c/${el.dataset.col}/${el.dataset.id}`);
       await neuLaden(r && r.nachgerueckt ? `Ausgetragen. ${anzeigeName(r.nachgerueckt)} rückt von der Reserve nach.` : "Entfernt");
@@ -2073,7 +2713,7 @@ inhalt.addEventListener("click", async (ev) => {
       await api("POST", "/api/c/waschdienst", { spielId: el.dataset.spiel, name });
       await neuLaden("Danke fürs Waschen");
     } else if (a === "antwort-absage") {
-      if (!meinKind()) throw new Error("Bitte zuerst deinen Sohn auswählen");
+      if (!meinKind()) throw new Error(erwachsen() ? "Bitte zuerst auswählen, wer du bist" : "Bitte zuerst deinen Sohn auswählen");
       await api("PUT", `/api/c/antworten/${el.dataset.termin}-${slug(meinKind())}`, { terminId: el.dataset.termin, familie: meinKind(), kommt: false, personen: 0, von: meinName() });
       await neuLaden("Schade, Absage ist eingetragen");
     } else if (a === "antwort-buchen" || a === "antwort-bezahlt") {
@@ -2081,14 +2721,25 @@ inhalt.addEventListener("click", async (ev) => {
       const id = `${tm.id}-${slug(el.dataset.familie)}`;
       const ant = Z.antworten.find((x) => x.id === id);
       if (a === "antwort-buchen") {
-        const betrag = (ant.personen || 0) * (tm.kostenProPerson || 0);
-        await api("POST", "/api/c/kasse", { datum: heute(), art: "einnahme", betrag, zweck: `${tm.titel}: Familie von ${el.dataset.familie}`, kategorie: "Mannschaftsfeier", kanal: "Bar", beleg: "" });
+        const gesamt = zahlende(tm, ant) * (tm.kostenProPerson || 0);
+        const betrag = ant.angezahlt ? gesamt - zahlende(tm, ant) * (tm.anzahlung || 0) : gesamt;
+        const kat = Z.einstellungen.kassenKategorien.find((k) => /tour/i.test(k) && tm.bis) || Z.einstellungen.kassenKategorien.find((k) => /feier|abend/i.test(k)) || "Mannschaftsfeier";
+        await api("POST", "/api/c/kasse", { datum: heute(), art: "einnahme", betrag, zweck: `${tm.titel}: ${wirIhr().Familie}${el.dataset.familie}${ant.angezahlt ? " (Restzahlung)" : ""}`, kategorie: kat, kanal: "Bar", beleg: "" });
         await api("PUT", "/api/c/antworten/" + id, { bezahlt: true });
         await neuLaden(`${euro(betrag)} gebucht`);
       } else {
         await api("PUT", "/api/c/antworten/" + id, { bezahlt: false });
         await neuLaden("Als unbezahlt markiert. Die Buchung bitte in der Kasse löschen, falls nötig.");
       }
+    } else if (a === "antwort-anzahlung") {
+      const tm = Z.termine.find((x) => x.id === el.dataset.termin);
+      const id = `${tm.id}-${slug(el.dataset.familie)}`;
+      const ant = Z.antworten.find((x) => x.id === id);
+      const betrag = zahlende(tm, ant) * (tm.anzahlung || 0);
+      const kat = Z.einstellungen.kassenKategorien.find((k) => /tour/i.test(k)) || Z.einstellungen.kassenKategorien.find((k) => /feier|abend/i.test(k)) || "Mannschaftsfeier";
+      await api("POST", "/api/c/kasse", { datum: heute(), art: "einnahme", betrag, zweck: `${tm.titel}: Anzahlung ${wirIhr().Familie}${el.dataset.familie}`, kategorie: kat, kanal: "Überweisung", beleg: "" });
+      await api("PUT", "/api/c/antworten/" + id, { angezahlt: true });
+      await neuLaden(`Anzahlung ${euro(betrag)} gebucht`);
     } else if (a === "abfrage-zelle") {
       const ab = Z.abfragen.find((x) => x.id === el.dataset.id);
       const alt = abfrageAntwort(ab, el.dataset.spieler);
@@ -2121,6 +2772,11 @@ inhalt.addEventListener("click", async (ev) => {
       offeneSpiele.add(el.dataset.id);
       for (const id of ["spiel-", "mehr-", "anbieten-"]) { const d = document.getElementById(id + el.dataset.id); if (d) d.open = true; }
       document.getElementById("anbieten-" + el.dataset.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else if (a === "mehr-oeffnen") {
+      if (offeneSpiele === null) offeneSpiele = new Set();
+      offeneSpiele.add(el.dataset.id);
+      for (const id of ["spiel-", "mehr-"]) { const d = document.getElementById(id + el.dataset.id); if (d) d.open = true; }
+      document.getElementById("mehr-" + el.dataset.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (a === "namen-bereinigen") {
       if (!confirm("Alle Einträge auf Vorname (Sohn) umstellen? Nachnamen werden dabei dauerhaft entfernt.")) return;
       const r = await api("POST", "/api/namen-bereinigen");
@@ -2206,8 +2862,10 @@ inhalt.addEventListener("click", async (ev) => {
   }
 });
 
+const offeneMehr = new Set(); // aufgeklappte Detailbereiche bleiben nach dem Neuladen offen
 inhalt.addEventListener("toggle", (ev) => {
   const d = ev.target;
+  if (d.classList?.contains("mehr-details")) { const id = d.id.replace(/^mehr-/, ""); if (d.open) offeneMehr.add(id); else offeneMehr.delete(id); return; }
   if (!d.classList?.contains("spiel-karte")) return;
   const menge = offeneSpiele;
   if (!menge) return;
@@ -2236,6 +2894,13 @@ inhalt.addEventListener("change", async (ev) => {
     return;
   }
   try {
+    if (el.dataset.aktion === "dienst-zuweisen") {
+      if (!el.value) return;
+      offeneSpiele?.add(el.dataset.spiel);
+      await api("POST", "/api/c/dienste", { spielId: el.dataset.spiel, dienst: el.dataset.dienst, name: el.value, person: el.value, eingetragenVon: meinName() || "Trainer" });
+      await neuLaden(`${el.value} ist für ${el.dataset.dienst} eingetragen`);
+      return;
+    }
     if (el.dataset.aktion === "antwort-admin") {
       const id = `${el.dataset.termin}-${slug(el.dataset.familie)}`;
       const alt = Z.antworten.find((x) => x.id === id);
@@ -2436,6 +3101,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 
 laden().then(() => {
+  setTimeout(pushAuffrischen, 1500);
   if (Z.demo) { if (lokal("otv_rolle") !== Z.rolle || !meinName()) demoPerson(); zeigen(); return; }
   zeigen();
   const alteRolle = lokal("otv_rolle");

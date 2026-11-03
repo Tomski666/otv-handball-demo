@@ -633,3 +633,68 @@ details.strichliste > summary { display: flex; justify-content: space-between; a
 .funktion .rollen .rolle-kasse { background: #fff4d6; color: #5a4300; }
 .funktion .karte-kopf { flex-wrap: wrap; gap: 6px; }
 .funktion .probier { margin: 10px 0 0; padding: 8px 12px; background: var(--blau-hell); border-radius: 8px; font-size: 14px; }
+
+/* ---------- Version 1.7: Rollen Spieler und Trainer ---------- */
+.nur-trainer, .nur-spieler { display: none !important; }
+body.rolle-trainer .nav .nur-trainer { display: revert !important; }
+body.rolle-spieler .unten-nav .nur-spieler { display: flex !important; }
+body.rolle-spieler .nav a:not([href="#/"]):not([href="#/mannschaft"]),
+body.rolle-spieler .unten-nav a[href="#/spiele"], body.rolle-spieler .unten-nav a[href="#/infos"], body.rolle-spieler .unten-nav a[href="#/kasse"] { display: none !important; }
+
+/* An- und Abmeldung */
+.anw-liste { list-style: none; margin: 8px 0 0; padding: 0; }
+.anw-zeile { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; padding: 12px 0; border-top: 1px solid var(--linie, #e3e7ec); align-items: start; }
+.anw-zeile:first-child { border-top: 0; }
+.anw-zeile .datum-block { grid-row: span 2; }
+.anw-mitte { min-width: 0; }
+.anw-titel { font-weight: 600; }
+.anw-knoepfe { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; }
+.anw-knopf { font: inherit; font-size: 14px; font-weight: 600; padding: 7px 14px; border-radius: 999px; border: 1.5px solid #c9d2dc; background: #fff; color: var(--text, #222); cursor: pointer; min-height: 38px; }
+.anw-knopf.an.ja { background: #1f8a4c; border-color: #1f8a4c; color: #fff; }
+.anw-knopf.an.nein { background: #b3261e; border-color: #b3261e; color: #fff; }
+.anw-knopf:disabled { opacity: .5; cursor: default; }
+.anw-zeile.ausfall .anw-titel { text-decoration: line-through; text-decoration-thickness: 1px; }
+.anw-wer summary { cursor: pointer; margin-top: 4px; }
+.anw-wer p { margin: 4px 0; }
+.anw-gruppe { margin: 10px 0; }
+.anw-gruppe > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.anw-name { font: inherit; font-size: 14px; padding: 5px 12px; border-radius: 999px; border: 1px solid #c9d2dc; background: #fff; cursor: pointer; }
+.anw-name.ja { background: #e7f5ec; border-color: #9fd3b3; }
+.anw-name.nein { background: #fbe9e8; border-color: #eab2ae; }
+.anw-name.offen { background: #fff6e0; border-color: #ecd28b; }
+.anw-bem { margin: 8px 0 0; padding-left: 18px; }
+.anw-karte > summary { list-style: none; cursor: pointer; }
+.anw-karte > summary::-webkit-details-marker { display: none; }
+@media (min-width: 640px) {
+  .anw-zeile { grid-template-columns: auto 1fr auto; }
+  .anw-zeile .datum-block { grid-row: auto; }
+  .anw-knoepfe { grid-column: 3; align-self: center; }
+}
+
+/* Fahrten */
+.fahrt-gesucht { background: #fff6e0; border: 1px solid #ecd28b; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+.fahrt-gesucht .liste li { gap: 8px; }
+.chip .x + .x { margin-left: 2px; }
+@media (max-width: 1100px) { body.rolle-spieler .unten-nav { grid-template-columns: repeat(3, 1fr); } }
+.anw-knopf.an.ja.standard { background: #e7f5ec; border-color: #9fd3b3; color: #1f6b3a; }
+/* Dialoge liegen in .lightbox: dort sind helle Knöpfe für die Fotoansicht gedacht, im weißen Dialog wieder normal darstellen */
+.lightbox .dialog-box .knopf.zweit { background: var(--weiss, #fff); color: var(--blau); border-color: var(--blau); }
+.lightbox .dialog-box .knopf.zweit:hover { background: var(--blau-hell); }
+
+/* ---------- Version 2.0 ---------- */
+.nav a[hidden], .unten-nav a[hidden] { display: none !important; }
+.x-klein { border: 0; background: none; color: var(--rot, #b3261e); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.vorschlag { display: inline-block; background: #fff6e0; border-radius: 6px; padding: 1px 6px; color: #5a4300; }
+select.zuweisen { width: auto; font-size: 13px; padding: 4px 8px; margin-top: 4px; }
+.fairness-liste { list-style: none; margin: 8px 0 0; padding: 0; }
+.fairness-liste li { display: grid; grid-template-columns: minmax(80px, 1fr) 2fr auto; gap: 10px; align-items: center; padding: 5px 0; border-top: 1px solid var(--linie, #e3e7ec); }
+.fairness-liste li:first-child { border-top: 0; }
+.fairness-liste li.ich { font-weight: 600; }
+.fairness-liste .balken { background: #eef1f4; border-radius: 99px; height: 8px; overflow: hidden; }
+.fairness-liste .balken span { display: block; height: 100%; background: var(--blau); border-radius: 99px; }
+.fairness-liste .zahl { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.modul-liste { display: grid; gap: 6px; }
+.modul-liste .schalter { align-items: flex-start; }
+.termin-karte.mehrtaegig { border-left: 4px solid var(--blau); }
+.vorschlag { display: block; width: fit-content; margin-top: 4px; }
+.summary-status .pill { white-space: normal; }

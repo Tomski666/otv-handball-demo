@@ -26,7 +26,7 @@ document.getElementById("login").addEventListener("submit", async (e) => {
   }
 });
 
-// Demo-Seite: Rollen per Knopf statt Passwort
+// Demo-Seite: Mannschaft und Rolle per Knopf statt Passwort
 (async () => {
   try {
     const d = await (await fetch("/api/demo")).json();
@@ -39,25 +39,40 @@ document.getElementById("login").addEventListener("submit", async (e) => {
       document.getElementById("login").after(h);
     }
     if (!d.demo || (d.fehlt && d.fehlt.length)) return;
-    document.title = "Demo · OTV C-Jugend";
-    const p = d.personen;
+    document.title = "Demo · Mannschaftsseite";
+    const teams = d.teams || {};
+    const ROLLEN = { spieler: "Als Spieler", eltern: "Als Elternteil", trainer: "Als Trainer", kasse: "Als Kasse" };
+    const INFO = {
+      jugend: { spieler: "für Training und Spiele an- und abmelden", eltern: "eintragen, Fahrten, Rückmeldungen", trainer: "dazu Infos, Termine, Abfragen, Anwesenheit", kasse: "dazu Kasse, Abrechnung und Verwaltung" },
+      herren: { spieler: "Dienste, Fahrten, Zu- und Absagen, Mannschaftstour", trainer: "dazu Infos, Termine, Abfragen, Anwesenheit", kasse: "dazu Kasse und Verwaltung" },
+    };
     const box = document.createElement("div");
     box.className = "demo-login";
-    box.innerHTML = `<p class="demo-marke">Demo</p>
-      <p>Alle Namen, Spiele und Beträge sind erfunden. Probier ruhig alles aus: Die Demo wird jede Nacht und auf Knopfdruck zurückgesetzt.</p>
-      <p><strong>Wie möchtest du die Seite sehen?</strong></p>
-      <div class="demo-rollen">
-        <button type="button" class="knopf gross" data-rolle="eltern">Als Elternteil<span>${p.eltern.text}: eintragen, Fahrten, Rückmeldungen</span></button>
-        <button type="button" class="knopf gross" data-rolle="trainer">Als Trainer<span>${p.trainer.text}: dazu Infos, Termine und Abfragen</span></button>
-        <button type="button" class="knopf gross" data-rolle="kasse">Als Kasse<span>${p.kasse.text}: dazu Kasse, Abrechnung und Verwaltung</span></button>
-      </div>`;
     document.getElementById("login").replaceWith(box);
-    document.querySelector(".login-box .leise").textContent = "So organisieren Eltern und Trainer einer Jugendmannschaft Standdienst, Kuchen, Fahrten, Trikots, Termine und die Mannschaftskasse.";
+    document.querySelector(".login-box h1").textContent = "Mannschaftsseite";
+    document.querySelector(".login-box .unterzeile").textContent = "Demo";
+    document.querySelector(".login-box .leise").textContent = "So organisieren Jugend- und Erwachsenenmannschaften Dienste, Fahrten, Training, Termine und die Mannschaftskasse.";
+    const zeigeTeams = () => {
+      box.innerHTML = `<p class="demo-marke">Demo</p>
+        <p>Alle Namen, Spiele und Beträge sind erfunden. Probier ruhig alles aus: Die Demo wird jede Nacht und auf Knopfdruck zurückgesetzt.</p>
+        <p><strong>Welche Mannschaft möchtest du sehen?</strong></p>
+        <div class="demo-rollen">${Object.entries(teams).map(([k, t]) => `<button type="button" class="knopf gross" data-team="${k}">${t.name}<span>${t.text}</span></button>`).join("")}</div>`;
+    };
+    const zeigeRollen = (team) => {
+      const p = d.personen[team] || {};
+      box.innerHTML = `<p class="demo-marke">Demo · ${teams[team]?.name || ""}</p>
+        <p><strong>Wie möchtest du die Seite sehen?</strong></p>
+        <div class="demo-rollen">${Object.keys(p).map((r) => `<button type="button" class="knopf gross" data-rolle="${r}" data-team="${team}">${ROLLEN[r]}<span>${p[r].text}: ${INFO[team]?.[r] || ""}</span></button>`).join("")}</div>
+        <button type="button" class="link-knopf abstand" data-zurueck="1">‹ andere Mannschaft</button>`;
+    };
+    zeigeTeams();
     box.addEventListener("click", async (e) => {
-      const b = e.target.closest("[data-rolle]");
+      if (e.target.closest("[data-zurueck]")) return zeigeTeams();
+      const b = e.target.closest("[data-team]");
       if (!b) return;
+      if (!b.dataset.rolle) return zeigeRollen(b.dataset.team);
       b.disabled = true;
-      const res = await fetch("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ demo: b.dataset.rolle }) });
+      const res = await fetch("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ demo: b.dataset.rolle, team: b.dataset.team }) });
       if (res.ok) location.href = "/";
       else b.disabled = false;
     });

@@ -49,7 +49,7 @@ export async function readSession(secret, token) {
   try {
     const data = JSON.parse(new TextDecoder().decode(b64urlDecode(payload)));
     if (!data.exp || data.exp < Date.now()) return null;
-    if (!["eltern", "trainer", "kasse"].includes(data.r)) return null;
+    if (!["spieler", "eltern", "trainer", "kasse"].includes(data.r)) return null;
     return data;
   } catch {
     return null;

@@ -5,29 +5,32 @@ import { getStore } from "@netlify/blobs";
 import {
   COOKIE_NAME, SESSION_DAYS, createSession, getCookie, passwordMatches, readSession, sessionCookie,
 } from "../shared/session.js";
-import { DEMO_PERSONEN, demoDaten, heuteBerlin } from "../shared/demo.js";
+import { DEMO_PERSONEN, DEMO_TEAMS, demoDaten, demoHerren, heuteBerlin } from "../shared/demo.js";
+import { aboKey, alleAbos, anAlle, senden, vapid } from "../shared/push.js";
 
 const env = (k) => (globalThis.Netlify?.env?.get(k) ?? process.env[k]);
-const daten = () => getStore({ name: "daten", consistency: "strong" });
-const fotos = () => getStore({ name: "fotos", consistency: "strong" });
+// In der Demo gibt es zwei Mannschaften mit getrennten Speichern (C-Jugend und Herren)
+const daten = (team = "jugend") => getStore({ name: team === "herren" ? "daten-herren" : "daten", consistency: "strong" });
+const fotos = (team = "jugend") => getStore({ name: team === "herren" ? "fotos-herren" : "fotos", consistency: "strong" });
 const istDemo = () => ["1", "true", "ja", "on"].includes(String(env("DEMO_MODUS") || "").trim().toLowerCase());
 
 // ---------- Demo ----------
 // Demo-Seite: erfundene Daten, die jeden Tag (oder auf Knopfdruck) frisch angelegt werden.
-async function demoAufbauen(store) {
-  for (const s of [store, fotos()]) {
+async function demoAufbauen(store, team = "jugend") {
+  for (const s of [store, fotos(team)]) {
     const { blobs } = await s.list();
     for (const b of blobs) if (!["kalender-token", "demo-stand"].includes(b.key)) await s.delete(b.key);
   }
-  const { einstellungen: e, eintraege } = demoDaten(heuteBerlin(), STANDARD_EINSTELLUNGEN);
+  const { einstellungen: e, eintraege } = (team === "herren" ? demoHerren : demoDaten)(heuteBerlin(), STANDARD_EINSTELLUNGEN);
   await store.setJSON("einstellungen", e);
   for (const [key, wert] of eintraege) await store.setJSON(key, wert);
   await store.set("demo-stand", heuteBerlin());
 }
-async function demoSicherstellen(store) {
+async function demoSicherstellen(store, team = "jugend") {
   if (!istDemo()) return;
-  if ((await store.get("demo-stand", { type: "text" })) !== heuteBerlin()) await demoAufbauen(store);
+  if ((await store.get("demo-stand", { type: "text" })) !== heuteBerlin()) await demoAufbauen(store, team);
 }
+const teamVon = (request) => (istDemo() && /(?:^|;\s*)demo_team=herren(?:;|$)/.test(request.headers.get("cookie") || "") ? "herren" : "jugend");
 
 // ---------- Datenmodell ----------
 const S = (max = 200) => ({ typ: "text", max });
@@ -63,7 +66,27 @@ const COLLECTIONS = {
     // Fahrgemeinschaft: ein Elternteil bietet Plätze für ein Auswärtsspiel an
     schreiben: "eltern", eigeneLoeschen: true,
     felder: { spielId: { ...S(40), pflicht: true }, fahrer: { ...S(60), pflicht: true }, plaetze: { typ: "zahl", pflicht: true },
-      treffpunkt: S(120), hinweis: S(160) },
+      treffpunkt: S(120), hinweis: S(160), richtung: { typ: "wahl", werte: ["beide", "hin", "rueck"] } },
+  },
+  fahrtbedarf: {
+    // "Wir brauchen noch eine Fahrt" für ein Auswärtsspiel
+    schreiben: "eltern", eigeneLoeschen: true,
+    felder: { spielId: { ...S(40), pflicht: true }, spieler: { ...S(30), pflicht: true }, richtung: { typ: "wahl", werte: ["beide", "hin", "rueck"] }, von: S(60) },
+  },
+  dienste: {
+    // Helferdienste pro Spiel (z. B. Hallenaufbau). person = Spieler bzw. Familie (Vorname des Sohns), zählt für die Fairness-Übersicht
+    schreiben: "eltern", eigeneLoeschen: true,
+    felder: { spielId: { ...S(40), pflicht: true }, dienst: { ...S(60), pflicht: true }, name: { ...S(60), pflicht: true }, person: S(40), eingetragenVon: S(60) },
+  },
+  anwesenheit: {
+    // An- und Abmeldung zu Training und Spielen. Schlüssel = Termin + Spieler. Spieler melden selbst, Trainer und Kasse können korrigieren, Eltern nur lesen.
+    schreiben: "spieler", upsert: true,
+    felder: { termin: { ...S(60), pflicht: true }, spieler: { ...S(30), pflicht: true }, status: { typ: "wahl", werte: ["ja", "nein"], pflicht: true }, bemerkung: S(80), von: S(60) },
+  },
+  trainingsausfall: {
+    // Training fällt aus: einzelner Tag (von = bis) oder Zeitraum (z. B. Ferien); slot = Nummer der Trainingszeit oder "alle"
+    schreiben: "trainer",
+    felder: { von: { typ: "datum", pflicht: true }, bis: { typ: "datum" }, slot: S(10), grund: S(120) },
   },
   mitfahrer: {
     schreiben: "eltern", eigeneLoeschen: true,
@@ -106,13 +129,14 @@ const COLLECTIONS = {
   termine: {
     schreiben: "trainer",
     felder: { titel: { ...S(80), pflicht: true }, datum: { typ: "datum", pflicht: true }, zeit: { typ: "zeit" }, ort: S(120),
-      beschreibung: S(2000), kostenProPerson: { typ: "zahl" }, frage: S(160), frist: { typ: "datum" } },
+      beschreibung: S(2000), kostenProPerson: { typ: "zahl" }, frage: S(160), frist: { typ: "datum" },
+      bis: { typ: "datum" }, anzahlung: { typ: "zahl" }, anzahlungBis: { typ: "datum" }, kostenFuer: { typ: "wahl", werte: ["alle", "zusatz"] } },
   },
   antworten: {
     // Schlüssel = Termin + Familie. Eltern melden sich zurück, die Kasse setzt "bezahlt".
-    schreiben: "eltern", upsert: true, nurKasse: ["bezahlt"],
+    schreiben: "eltern", upsert: true, nurKasse: ["bezahlt", "angezahlt"],
     felder: { terminId: { ...S(40), pflicht: true }, familie: { ...S(40), pflicht: true }, kommt: { typ: "bool" },
-      personen: { typ: "zahl" }, bemerkung: S(160), bezahlt: { typ: "bool" }, von: S(60) },
+      personen: { typ: "zahl" }, bemerkung: S(160), bezahlt: { typ: "bool" }, angezahlt: { typ: "bool" }, von: S(60) },
   },
   kasse: {
     schreiben: "kasse",
@@ -160,6 +184,16 @@ const STANDARD_EINSTELLUNGEN = {
   zeitnehmerPlaetze: 1,
   zeitnehmerHinweis: "Ohne Zeitnehmer droht eine Strafe für die Mannschaft.",
   standdienstVorlauf: 60, // Minuten vor Anpfiff
+  anwesenheitTraining: "abmelden", // "abmelden" = dabei, wer sich nicht abmeldet; "zusagen" = jeder muss zusagen
+  anwesenheitTage: 14, // so viele Tage im Voraus werden Termine zur An- und Abmeldung gezeigt
+  pushOffeneAufgaben: true, // Push zwei Tage vor dem Spiel, wenn Standdienst, Zeitnehmer oder Fahrer fehlen
+  // Ab 2.0: Mannschaft, Module, Helferdienste
+  mannschaftstyp: "jugend", // "jugend" (Eltern + Spieler) oder "erwachsene" (Spieler sind selbst die Nutzer)
+  mannschaftName: "männliche C-Jugend",
+  vereinName: "Ohligser TV 1888",
+  module: { dienste: false }, // fehlt ein Modul hier, ist es eingeschaltet
+  dienstArten: [], // { name, personen, vorlauf } vorlauf = Minuten vor Anwurf, -1 = nach dem Spiel
+  dienstVorschlagTage: 3, // so viele Tage vor dem Spiel schlägt die App für offene Dienste vor, wer dran wäre
   standdienstInfo: "Die Jungs sind ebenfalls eine Stunde vor Anpfiff da. Aufgaben: Stand aufbauen, verkaufen und kassieren, am Ende abbauen.",
   kassenKategorien: ["Heimspiel-Catering", "Getränke OTV", "Einkauf Catering", "Mannschaftsfeier", "Geschenke", "Turnier/Fahrten", "Sonstiges"],
   kassenKanaele: ["Bar", "PayPal", "Überweisung", "Karte/SumUp"],
@@ -305,7 +339,7 @@ async function kalenderIcs(store) {
   const termine = (await liste(store, "termine")).filter((t) => t.datum >= ab);
   const stempel = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
   const z = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//OTV C-Jugend//Elternseite//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    `X-WR-CALNAME:OTV männliche C-Jugend${istDemo() ? " (Demo)" : ""}`, "X-WR-TIMEZONE:Europe/Berlin", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
+    `X-WR-CALNAME:${String(e.vereinName || "").replace(/\s*\d{4}$/, "") || "Handball"} ${e.mannschaftName || "Mannschaft"}${istDemo() ? " (Demo)" : ""}`, "X-WR-TIMEZONE:Europe/Berlin", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
     "BEGIN:VTIMEZONE", "TZID:Europe/Berlin",
     "BEGIN:DAYLIGHT", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0200", "TZNAME:CEST", "DTSTART:19700329T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", "END:DAYLIGHT",
     "BEGIN:STANDARD", "TZOFFSETFROM:+0200", "TZOFFSETTO:+0100", "TZNAME:CET", "DTSTART:19701025T030000", "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", "END:STANDARD",
@@ -314,7 +348,7 @@ async function kalenderIcs(store) {
     const d = s.datum.replace(/-/g, "");
     const ort = [s.halle, halleAdresse(s.halle)].filter(Boolean).join(", ");
     const beschr = [s.heim ? "Heimspiel" : "Auswärtsspiel",
-      s.zeit ? `Die Jungs sind ${vorlauf} Minuten vor Anwurf in der Halle (${plusMinuten(s.zeit, -vorlauf).slice(0, 2)}:${plusMinuten(s.zeit, -vorlauf).slice(2, 4)} Uhr).` : "",
+      s.zeit ? `${e.mannschaftstyp === "erwachsene" ? "Treffen" : "Die Jungs sind"} ${vorlauf} Minuten vor Anwurf in der Halle (${plusMinuten(s.zeit, -vorlauf).slice(0, 2)}:${plusMinuten(s.zeit, -vorlauf).slice(2, 4)} Uhr).` : "",
       s.hinweis || ""].filter(Boolean).join("\n");
     z.push("BEGIN:VEVENT", `UID:spiel-${s.id}@otv-c-jugend`, `DTSTAMP:${stempel}`);
     if (s.zeit) z.push(`DTSTART;TZID=Europe/Berlin:${d}T${s.zeit.replace(":", "")}00`, `DTEND;TZID=Europe/Berlin:${d}T${plusMinuten(s.zeit, 90)}`);
@@ -327,11 +361,12 @@ async function kalenderIcs(store) {
     const d = t.datum.replace(/-/g, "");
     const ort = [t.ort, halleAdresse(t.ort)].filter(Boolean).join(", ");
     z.push("BEGIN:VEVENT", `UID:termin-${t.id}@otv-c-jugend`, `DTSTAMP:${stempel}`);
-    if (t.zeit) z.push(`DTSTART;TZID=Europe/Berlin:${d}T${t.zeit.replace(":", "")}00`, `DTEND;TZID=Europe/Berlin:${d}T${plusMinuten(t.zeit, 180)}`);
+    if (t.bis && t.bis > t.datum) z.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${naechsterTag(t.bis)}`); // mehrtägig, z. B. Mannschaftstour
+    else if (t.zeit) z.push(`DTSTART;TZID=Europe/Berlin:${d}T${t.zeit.replace(":", "")}00`, `DTEND;TZID=Europe/Berlin:${d}T${plusMinuten(t.zeit, 180)}`);
     else z.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${naechsterTag(t.datum)}`);
-    z.push(`SUMMARY:${icsText("C-Jugend: " + t.titel)}`);
+    z.push(`SUMMARY:${icsText((e.mannschaftName || "Mannschaft") + ": " + t.titel)}`);
     if (ort) z.push(`LOCATION:${icsText(ort)}`);
-    z.push(`DESCRIPTION:${icsText("Rückmeldung und Details auf der Elternseite.")}`, "END:VEVENT");
+    z.push(`DESCRIPTION:${icsText("Rückmeldung und Details auf der Mannschaftsseite.")}`, "END:VEVENT");
   }
   z.push("END:VCALENDAR");
   return z.map(icsFalten).join("\r\n") + "\r\n";
@@ -346,7 +381,14 @@ const json = (data, status = 200, headers = {}) =>
 const fehler = (text, status = 400) => json({ fehler: text }, status);
 const neueId = () => Date.now().toString(36) + "-" + crypto.randomUUID().slice(0, 8);
 // Rollen: eltern < trainer < kasse. Trainer sehen alles wie Eltern und dürfen zusätzlich Hinweise und Abfragen anlegen.
-const darf = (rolle, benoetigt) => rolle === "kasse" || (benoetigt === "eltern" && (rolle === "eltern" || rolle === "trainer")) || (benoetigt === "trainer" && rolle === "trainer");
+const darf = (rolle, benoetigt) => rolle === "kasse"
+  || (benoetigt === "spieler" && ["spieler", "eltern", "trainer"].includes(rolle))
+  || (benoetigt === "eltern" && (rolle === "eltern" || rolle === "trainer"))
+  || (benoetigt === "trainer" && rolle === "trainer");
+// Was der Spieler-Zugang sehen darf (keine Kasse, keine Einträge der Eltern außer Fahrten)
+const SPIELER_SICHT = ["spiele", "kader", "trainer", "hinweise", "anwesenheit", "trainingsausfall", "fahrten", "mitfahrer"];
+const SPIELER_EINSTELLUNGEN = ["teamText", "liga", "trainingszeiten", "hallen", "standdienstVorlauf", "anwesenheitTraining", "anwesenheitTage", "handballNetUrl", "galerieAktiv", "datenstand",
+  "mannschaftstyp", "mannschaftName", "vereinName", "module"];
 
 function pruefe(def, eingabe, teilweise = false) {
   const aus = {};
@@ -480,6 +522,40 @@ async function einstellungen(store) {
   return { ...STANDARD_EINSTELLUNGEN, datenstand: DATENSTAND };
 }
 
+// ---------- Fahrten: Hilfen ----------
+const slugServer = (t) => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const richtungen = (r) => (r === "hin" ? ["hin"] : r === "rueck" ? ["rueck"] : ["hin", "rueck"]);
+async function istFahrerVon(store, fahrtId, besitzer) {
+  if (!besitzer || !fahrtId) return false;
+  const f = await store.get(`fahrten/${fahrtId}`, { type: "json" });
+  return !!f && f.besitzer === besitzer;
+}
+// Sitzt der Spieler für dieselbe Strecke schon in einem anderen Auto zum selben Spiel?
+async function fahrtKonflikt(store, name, zielFahrt, ausserMitfahrerId) {
+  const fahrten = (await liste(store, "fahrten")).filter((f) => f.spielId === zielFahrt.spielId);
+  const ziel = new Set(richtungen(zielFahrt.richtung));
+  for (const m of (await liste(store, "mitfahrer")).filter((x) => x.name.toLowerCase() === String(name).toLowerCase() && x.id !== ausserMitfahrerId)) {
+    const f = fahrten.find((x) => x.id === m.fahrtId);
+    if (f && richtungen(f.richtung).some((r) => ziel.has(r))) return `${name} fährt für diese Strecke schon bei ${String(f.fahrer).replace(/\s*\(.*\)$/, "")} mit. Bitte dort „umsteigen“ nutzen.`;
+  }
+  return "";
+}
+// Wer mitfährt, braucht keine Fahrt mehr: passenden Bedarf entfernen
+async function bedarfErledigt(store, mitfahrer) {
+  const f = await store.get(`fahrten/${mitfahrer.fahrtId}`, { type: "json" });
+  if (!f) return;
+  const abgedeckt = new Set(richtungen(f.richtung));
+  for (const b of (await liste(store, "fahrtbedarf")).filter((x) => x.spielId === f.spielId && x.spieler.toLowerCase() === mitfahrer.name.toLowerCase())) {
+    const rest = richtungen(b.richtung).filter((r) => !abgedeckt.has(r));
+    if (!rest.length) await store.delete(`fahrtbedarf/${b.id}`);
+    else await store.setJSON(`fahrtbedarf/${b.id}`, { ...b, richtung: rest[0] });
+  }
+}
+const ausfallText = (a) => {
+  const d = (x) => x.split("-").reverse().join(".");
+  return `${a.bis && a.bis !== a.von ? `Vom ${d(a.von)} bis ${d(a.bis)}` : `Am ${d(a.von)}`} fällt das Training aus${a.grund ? ": " + a.grund : "."}`;
+};
+
 const oeffentlich = (eintrag, besitzer) => {
   const { besitzer: b, ...rest } = eintrag;
   return { ...rest, eigen: !!besitzer && b === besitzer };
@@ -497,7 +573,7 @@ export default async (request) => {
     const fehlt = [];
     if (!secret) fehlt.push("SESSION_SECRET");
     if (!istDemo() && !env("ELTERN_PASSWORT")) fehlt.push("DEMO_MODUS");
-    return json(istDemo() ? { demo: true, personen: DEMO_PERSONEN, fehlt } : { demo: false, fehlt });
+    return json(istDemo() ? { demo: true, personen: DEMO_PERSONEN, teams: DEMO_TEAMS, fehlt } : { demo: false, fehlt });
   }
 
   if (!secret || (!istDemo() && (!env("ELTERN_PASSWORT") || !env("KASSE_PASSWORT")))) {
@@ -506,12 +582,22 @@ export default async (request) => {
 
   // Login ist die einzige Route ohne Sitzung
   if (teile[0] === "login" && methode === "POST") {
-    const { passwort, demo } = await request.json().catch(() => ({}));
+    const { passwort, demo, team } = await request.json().catch(() => ({}));
     let rolle = null;
-    if (istDemo() && ["eltern", "trainer", "kasse"].includes(demo)) rolle = demo;
+    if (istDemo() && ["spieler", "eltern", "trainer", "kasse"].includes(demo)) {
+      // Demo: Mannschaft wählen (eigener Datenspeicher), Herren haben keinen Eltern-Zugang
+      const t = team === "herren" ? "herren" : "jugend";
+      if (t === "herren" && demo === "eltern") return fehler("Bei den Herren gibt es keinen Eltern-Zugang");
+      const token = await createSession(secret, demo);
+      const h = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      h.append("set-cookie", sessionCookie(token, SESSION_DAYS * 86400));
+      h.append("set-cookie", `demo_team=${t}; Path=/; Max-Age=${SESSION_DAYS * 86400}; SameSite=Lax; Secure`);
+      return new Response(JSON.stringify({ rolle: demo, team: t }), { status: 200, headers: h });
+    }
     else if (env("KASSE_PASSWORT") && await passwordMatches(passwort, env("KASSE_PASSWORT"))) rolle = "kasse";
     else if (env("TRAINER_PASSWORT") && await passwordMatches(passwort, env("TRAINER_PASSWORT"))) rolle = "trainer";
     else if (env("ELTERN_PASSWORT") && await passwordMatches(passwort, env("ELTERN_PASSWORT"))) rolle = "eltern";
+    else if (env("SPIELER_PASSWORT") && await passwordMatches(passwort, env("SPIELER_PASSWORT"))) rolle = "spieler";
     if (!rolle) {
       await new Promise((r) => setTimeout(r, 800)); // bremst Durchprobieren
       return fehler("Passwort falsch", 401);
@@ -522,11 +608,15 @@ export default async (request) => {
 
   // Kalender-Abo (ohne Anmeldung, nur mit geheimer Zeichenfolge in der Adresse)
   if (teile[0] === "kalender" && teile[1] && methode === "GET") {
-    const store = daten();
-    await demoSicherstellen(store);
-    const token = await store.get("kalender-token", { type: "text" });
     const angefragt = teile[1].replace(/\.ics$/, "");
-    if (!token || angefragt.length !== token.length || !gleich(angefragt, token)) return new Response("Nicht gefunden", { status: 404 });
+    let store = null;
+    for (const t of istDemo() ? ["jugend", "herren"] : ["jugend"]) {
+      const st = daten(t);
+      await demoSicherstellen(st, t);
+      const token = await st.get("kalender-token", { type: "text" });
+      if (token && angefragt.length === token.length && gleich(angefragt, token)) store = st;
+    }
+    if (!store) return new Response("Nicht gefunden", { status: 404 });
     return new Response(await kalenderIcs(store), {
       headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "public, max-age=900", "content-disposition": 'inline; filename="otv-c-jugend.ics"' },
     });
@@ -549,12 +639,17 @@ export default async (request) => {
       return json({ ok: true }, 200, { "set-cookie": sessionCookie("", 0) });
     }
 
-    const store = daten();
-    await demoSicherstellen(store);
+    const team = teamVon(request);
+    const store = daten(team);
+    await demoSicherstellen(store, team);
+    // Bei Erwachsenenmannschaften sind die Spieler selbst die Nutzer: gleiche Rechte wie Eltern
+    const e0 = await einstellungen(store);
+    const erwachsen = e0.mannschaftstyp === "erwachsene";
+    const rechte = rolle === "spieler" && erwachsen ? "eltern" : rolle;
 
     if (teile[0] === "demo" && teile[1] === "zuruecksetzen" && methode === "POST") {
       if (!istDemo()) return fehler("Unbekannte Anfrage", 404);
-      await demoAufbauen(store);
+      await demoAufbauen(store, team);
       return json({ ok: true });
     }
 
@@ -587,6 +682,31 @@ export default async (request) => {
       z[name] = Math.max(0, (z[name] || 0) + d);
       await store.setJSON(key, { ...alt, zaehler: zaehlerText(z), geaendert: new Date().toISOString() });
       return json({ summen: (await strichSummen(store, [spielId]))[spielId] || {} });
+    }
+
+    // ---------- Push ----------
+    if (teile[0] === "push") {
+      if (teile[1] === "schluessel" && methode === "GET") return json({ publicKey: (await vapid(store)).publicKey });
+      if (teile[1] === "abo" && methode === "POST") {
+        const { subscription, kind, name } = await request.json().catch(() => ({}));
+        if (!subscription || typeof subscription.endpoint !== "string" || !/^https:\/\//.test(subscription.endpoint) || !subscription.keys?.p256dh || !subscription.keys?.auth) return fehler("Ungültiges Abo");
+        const key = await aboKey(subscription.endpoint);
+        await store.setJSON(key, { subscription: { endpoint: subscription.endpoint.slice(0, 600), keys: { p256dh: String(subscription.keys.p256dh).slice(0, 200), auth: String(subscription.keys.auth).slice(0, 100) } },
+          besitzer, rolle, kind: String(kind || "").slice(0, 30), name: String(name || "").slice(0, 60), erstellt: new Date().toISOString() });
+        return json({ ok: true });
+      }
+      if (teile[1] === "abo" && methode === "DELETE") {
+        const { endpoint } = await request.json().catch(() => ({}));
+        if (endpoint) await store.delete(await aboKey(endpoint));
+        return json({ ok: true });
+      }
+      if (teile[1] === "test" && methode === "POST") {
+        const { endpoint } = await request.json().catch(() => ({}));
+        const abo = endpoint ? await store.get(await aboKey(endpoint), { type: "json" }) : null;
+        if (!abo) return fehler("Auf diesem Gerät sind keine Benachrichtigungen eingeschaltet", 404);
+        const r = await senden(store, [{ abo, titel: "Test", text: "So sehen Erinnerungen der Mannschaftsseite aus. 👍", link: "/" }]);
+        return json(r);
+      }
     }
 
     // Namen bereinigen (nur Kasse, auf Knopfdruck): nur Vorname, Sohn aus Klammer oder Zuordnung fest eintragen
@@ -624,8 +744,16 @@ export default async (request) => {
     // Gesamtzustand für die Seite
     if (teile[0] === "zustand" && methode === "GET") {
       const e = await einstellungen(store);
-      const zustand = { rolle, einstellungen: e };
-      if (istDemo()) zustand.demo = { person: DEMO_PERSONEN[rolle] };
+      if (rechte === "spieler") {
+        const zustand = { rolle, einstellungen: Object.fromEntries(SPIELER_EINSTELLUNGEN.map((k) => [k, e[k]])), strichBerechtigt: [], strichSummen: {} };
+        if (istDemo()) zustand.demo = { team, person: DEMO_PERSONEN[team][rolle] };
+        await Promise.all(SPIELER_SICHT.map(async (col) => {
+          zustand[col] = (await liste(store, col)).map((x) => oeffentlich(x, besitzer));
+        }));
+        return json(zustand);
+      }
+      const zustand = { rolle, einstellungen: e, spielerZugang: !!env("SPIELER_PASSWORT") || istDemo() };
+      if (istDemo()) zustand.demo = { team, person: DEMO_PERSONEN[team][rolle] };
       const berechtigt = await strichBerechtigt(store, rolle, besitzer);
       zustand.strichBerechtigt = berechtigt === null ? "alle" : berechtigt;
       zustand.strichSummen = berechtigt === null || berechtigt.length ? await strichSummen(store, berechtigt) : {};
@@ -657,6 +785,17 @@ export default async (request) => {
         .slice(0, 30).map((g) => ({ name: String(g.name).trim().slice(0, 40), preis: Math.max(0, Math.round(Number(g.preis)) || 0) }));
       zusammen.otvAnteilProzent = Math.min(100, Math.max(0, Number.parseInt(zusammen.otvAnteilProzent, 10) || 0));
       zusammen.reservePlaetze = Math.min(5, Math.max(0, Number.parseInt(zusammen.reservePlaetze, 10) || 0));
+      zusammen.anwesenheitTraining = zusammen.anwesenheitTraining === "zusagen" ? "zusagen" : "abmelden";
+      zusammen.anwesenheitTage = Math.min(42, Math.max(3, Number.parseInt(zusammen.anwesenheitTage, 10) || 14));
+      zusammen.pushOffeneAufgaben = zusammen.pushOffeneAufgaben !== false;
+      zusammen.mannschaftstyp = zusammen.mannschaftstyp === "erwachsene" ? "erwachsene" : "jugend";
+      zusammen.mannschaftName = String(zusammen.mannschaftName || "").trim().slice(0, 60) || "Mannschaft";
+      zusammen.vereinName = String(zusammen.vereinName || "").trim().slice(0, 60);
+      const mo = zusammen.module && typeof zusammen.module === "object" && !Array.isArray(zusammen.module) ? zusammen.module : {};
+      zusammen.module = Object.fromEntries(Object.entries(mo).filter(([k]) => /^[a-z]{2,20}$/.test(k)).slice(0, 30).map(([k, v]) => [k, v !== false]));
+      zusammen.dienstArten = (Array.isArray(zusammen.dienstArten) ? zusammen.dienstArten : []).filter((d) => d && String(d.name || "").trim()).slice(0, 15)
+        .map((d) => ({ name: String(d.name).trim().slice(0, 60), personen: Math.min(20, Math.max(1, Number.parseInt(d.personen, 10) || 1)), vorlauf: Math.min(600, Math.max(-1, Number.parseInt(d.vorlauf, 10) || 0)) }));
+      zusammen.dienstVorschlagTage = Math.min(14, Math.max(0, Number.parseInt(zusammen.dienstVorschlagTage, 10) || 0));
       await store.setJSON("einstellungen", zusammen);
       return json(zusammen);
     }
@@ -668,13 +807,21 @@ export default async (request) => {
       const id = teile[2];
 
       if (methode === "POST") {
-        if (!darf(rolle, def.schreiben)) return fehler("Keine Berechtigung", 403);
-        const werte = pruefe(def, await request.json());
+        if (!darf(rechte, def.schreiben)) return fehler("Keine Berechtigung", 403);
+        const body = await request.json();
+        const werte = pruefe(def, body);
         if (rolle !== "kasse") for (const f of def.nurKasse || []) delete werte[f];
         if (col === "zeitnehmer") {
           const e = await einstellungen(store);
           const belegt = (await liste(store, "zeitnehmer")).filter((x) => x.spielId === werte.spielId).length;
           if (belegt >= (e.zeitnehmerPlaetze || 1)) return fehler("Für dieses Spiel gibt es schon einen Zeitnehmer", 409);
+        }
+        if (col === "dienste") {
+          const art = (e0.dienstArten || []).find((d) => d.name === werte.dienst);
+          if (!art) return fehler("Diesen Dienst gibt es nicht mehr");
+          const belegt = (await liste(store, "dienste")).filter((x) => x.spielId === werte.spielId && x.dienst === werte.dienst);
+          if (belegt.length >= art.personen) return fehler(`${art.name} ist schon voll besetzt, danke!`, 409);
+          if (werte.person && belegt.some((x) => (x.person || "").toLowerCase() === werte.person.toLowerCase())) return fehler(`${werte.person} ist hier schon eingetragen`, 409);
         }
         if (col === "waschdienst" && (await liste(store, "waschdienst")).some((x) => x.spielId === werte.spielId))
           return fehler("Für dieses Spiel nimmt schon jemand die Wäsche mit", 409);
@@ -685,6 +832,8 @@ export default async (request) => {
           const mit = (await liste(store, "mitfahrer")).filter((x) => x.fahrtId === werte.fahrtId);
           if (mit.length >= fahrt.plaetze) return fehler("Diese Fahrt ist schon voll", 409);
           if (mit.some((x) => x.name.toLowerCase() === werte.name.toLowerCase())) return fehler(`${werte.name} fährt hier schon mit`, 409);
+          const konflikt = await fahrtKonflikt(store, werte.name, fahrt, null);
+          if (konflikt) return fehler(konflikt, 409);
         }
         if (col === "standdienst") {
           const e = await einstellungen(store);
@@ -692,20 +841,45 @@ export default async (request) => {
           const max = werte.reserve ? e.reservePlaetze : e.standdienstPlaetze;
           if (belegt >= max) return fehler(werte.reserve ? "Der Reserveplatz ist schon vergeben" : "Alle Plätze für dieses Spiel sind schon vergeben", 409);
         }
+        if (col === "anwesenheit") return fehler("Bitte über die An- und Abmeldung eintragen");
         const neu = { id: neueId(), ...werte, besitzer, erstellt: new Date().toISOString() };
         await store.setJSON(`${col}/${neu.id}`, neu);
+        if (col === "mitfahrer") await bedarfErledigt(store, neu);
+        // Push: Info vom Trainerteam (wenn gewünscht) und Trainingsausfall an alle
+        if (!istDemo() && e0.module?.push !== false) {
+          if (col === "hinweise" && body.push === true) await anAlle(store, null, "Info vom Trainerteam", werte.text.slice(0, 180), "/#/infos").catch(() => {});
+          if (col === "trainingsausfall") await anAlle(store, null, "Training fällt aus", ausfallText(werte), "/").catch(() => {});
+        }
         return json(oeffentlich(neu, besitzer), 201);
       }
 
       if (methode === "PUT" && id) {
-        if (!darf(rolle, def.schreiben)) return fehler("Keine Berechtigung", 403);
+        if (!darf(rechte, def.schreiben)) return fehler("Keine Berechtigung", 403);
         if (!/^[\w-]{1,100}$/.test(id)) return fehler("Ungültiger Schlüssel");
         const alt = await store.get(`${col}/${id}`, { type: "json" });
         if (!alt && !def.upsert) return fehler("Nicht gefunden", 404);
-        if (alt && def.eigeneLoeschen && rolle !== "kasse" && alt.besitzer !== besitzer) {
+        const fahrerDarf = col === "mitfahrer" && alt && await istFahrerVon(store, alt.fahrtId, besitzer);
+        if (alt && def.eigeneLoeschen && rolle !== "kasse" && alt.besitzer !== besitzer && !fahrerDarf) {
           return fehler("Nur eigene Einträge können geändert werden", 403);
         }
+        if (col === "anwesenheit" && rolle === "eltern") return fehler("Zu- und Absagen machen die Jungs selbst mit dem Spieler-Zugang", 403);
+        if (col === "anwesenheit") {
+          if (!/^(tr-\d{4}-\d{2}-\d{2}-\d{1,2}|sp-[\w-]{1,60})$/.test(String((await request.clone().json().catch(() => ({}))).termin || ""))) return fehler("Unbekannter Termin");
+        }
         const werte = pruefe(def, await request.json(), true);
+        if (col === "anwesenheit" && id !== `${werte.termin}-${slugServer(werte.spieler)}`) return fehler("Ungültiger Schlüssel");
+        if (col === "mitfahrer" && werte.fahrtId && werte.fahrtId !== alt.fahrtId) {
+          // Umsteigen in ein anderes Auto desselben Spiels
+          const ziel = await store.get(`fahrten/${werte.fahrtId}`, { type: "json" });
+          const quelle = await store.get(`fahrten/${alt.fahrtId}`, { type: "json" });
+          if (!ziel) return fehler("Diese Fahrt gibt es nicht mehr", 404);
+          if (quelle && quelle.spielId !== ziel.spielId) return fehler("Umsteigen geht nur zwischen Fahrten zum selben Spiel");
+          const mit = (await liste(store, "mitfahrer")).filter((x) => x.fahrtId === ziel.id);
+          if (mit.length >= ziel.plaetze) return fehler("Diese Fahrt ist schon voll", 409);
+          const konflikt = await fahrtKonflikt(store, alt.name, ziel, alt.id);
+          if (konflikt) return fehler(konflikt, 409);
+          for (const k of Object.keys(werte)) if (!["fahrtId"].includes(k)) delete werte[k];
+        }
         if (rolle !== "kasse") for (const f of def.nurKasse || []) delete werte[f];
         const neu = { ...(alt || { id, erstellt: new Date().toISOString() }), ...werte, geaendert: new Date().toISOString() };
         await store.setJSON(`${col}/${id}`, neu);
@@ -716,7 +890,9 @@ export default async (request) => {
         const alt = await store.get(`${col}/${id}`, { type: "json" });
         if (!alt) return json({ ok: true });
         const eigen = def.eigeneLoeschen && alt.besitzer && alt.besitzer === besitzer;
-        if (!(rolle === "kasse" || (def.schreiben === "trainer" && rolle === "trainer") || (eigen && darf(rolle, def.schreiben)))) {
+        const fahrer = col === "mitfahrer" && darf(rechte, "eltern") && await istFahrerVon(store, alt.fahrtId, besitzer);
+        const trainerDienst = col === "dienste" && rolle === "trainer";
+        if (!(rolle === "kasse" || (def.schreiben === "trainer" && rolle === "trainer") || (eigen && darf(rechte, def.schreiben)) || fahrer || trainerDienst)) {
           return fehler("Nur eigene Einträge können gelöscht werden", 403);
         }
         await store.delete(`${col}/${id}`);
@@ -726,6 +902,10 @@ export default async (request) => {
             .sort((a, b) => (a.erstellt || "").localeCompare(b.erstellt || ""))[0];
           if (reserve) {
             await store.setJSON(`standdienst/${reserve.id}`, { ...reserve, reserve: false, nachgerueckt: true, geaendert: new Date().toISOString() });
+            if (!istDemo() && e0.module?.push !== false && reserve.besitzer) {
+              const sp = await store.get(`spiele/${alt.spielId}`, { type: "json" });
+              await anAlle(store, (a) => a.besitzer === reserve.besitzer, "Du bist nachgerückt", `Du hast jetzt Standdienst${sp ? ` beim Heimspiel am ${sp.datum.split("-").reverse().join(".")} gegen ${sp.gegner}` : ""}. Danke!`, "/").catch(() => {});
+            }
             return json({ ok: true, nachgerueckt: reserve.name });
           }
         }
@@ -741,6 +921,7 @@ export default async (request) => {
     }
 
     // ---------- Galerie ----------
+    if (rechte === "spieler" && ["galerie", "foto", "strich", "einstellungen"].includes(teile[0])) return fehler("Keine Berechtigung", 403);
     if (teile[0] === "galerie") {
       const id = teile[1];
       if (methode === "GET" && !id) {
@@ -765,7 +946,7 @@ export default async (request) => {
         const istJpeg = (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
         if (!istJpeg(bGross) || !istJpeg(bKlein)) return fehler("Nur JPEG-Bilder werden angenommen");
         const fid = neueId();
-        const fs = fotos();
+        const fs = fotos(team);
         await fs.set(`${fid}/gross`, bGross);
         await fs.set(`${fid}/klein`, bKlein);
         const meta = { id: fid, album, name, titel, besitzer, gemeldet: false, erstellt: new Date().toISOString() };
@@ -795,7 +976,7 @@ export default async (request) => {
         if (!(rolle === "kasse" || (meta.besitzer && meta.besitzer === besitzer))) {
           return fehler("Nur eigene Fotos können gelöscht werden", 403);
         }
-        const fs = fotos();
+        const fs = fotos(team);
         await fs.delete(`${id}/gross`);
         await fs.delete(`${id}/klein`);
         await store.delete(`galerie/${id}`);
@@ -807,7 +988,7 @@ export default async (request) => {
     if (teile[0] === "foto" && methode === "GET" && teile[1] && ["gross", "klein"].includes(teile[2])) {
       const meta = await store.get(`galerie/${teile[1]}`, { type: "json" });
       if (!meta || (meta.gemeldet && rolle !== "kasse")) return fehler("Nicht gefunden", 404);
-      const bild = await fotos().get(`${teile[1]}/${teile[2]}`, { type: "arrayBuffer" });
+      const bild = await fotos(team).get(`${teile[1]}/${teile[2]}`, { type: "arrayBuffer" });
       if (!bild) return fehler("Nicht gefunden", 404);
       return new Response(bild, {
         headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=86400" },

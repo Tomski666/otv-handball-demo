@@ -89,3 +89,23 @@ Derselbe Code läuft als Demo, wenn die Umgebungsvariable `DEMO_MODUS=1` gesetzt
 - Alle Daten sind erfunden (`netlify/shared/demo.js`) und werden relativ zum heutigen Tag erzeugt.
 - Die Daten werden jeden Tag beim ersten Aufruf neu angelegt, zusätzlich per Knopf „Zurücksetzen“ in der gelben Leiste.
 - Ohne `DEMO_MODUS` ist die Demo komplett aus. `/api/demo` meldet dann nur `{"demo": false}`.
+
+## Version 1.7: Spieler-Zugang, Anwesenheit, Push, Fahrten
+
+**Neue Umgebungsvariable (optional):** `SPIELER_PASSWORT`. Damit melden sich die Jungs für Training und Spiele an oder ab. Ohne die Variable gibt es keinen Spieler-Zugang, alles andere läuft weiter.
+
+- **Spieler-Zugang:** sieht nur Training und Spiele, Infos vom Trainerteam, Fahrgemeinschaften, Mannschaft. Keine Kasse, keine Einträge der Eltern. Der Server liefert dem Spieler-Zugang diese Daten gar nicht erst aus.
+- **Anwesenheit** (`#/anwesenheit`): Termine aus den Trainingszeiten (Verwaltung) und den Spielen. Einstellung „Beim Training gilt“: dabei, wer sich nicht abmeldet, oder jeder muss zusagen. Bei Spielen immer zu- oder absagen. Trainer sehen die Übersicht, können umstellen und Trainings absagen (Tag oder Zeitraum).
+- **Push:** Die Schlüssel werden beim ersten Gebrauch automatisch erzeugt und im Datenspeicher abgelegt, in Netlify ist dafür nichts einzutragen. Die geplante Funktion `netlify/functions/erinnerungen.mjs` läuft täglich um 16:00 UTC (17 bzw. 18 Uhr) und schickt Erinnerungen für morgen. Sofort-Nachrichten: Info vom Trainerteam (wenn angehakt), Training fällt aus, Nachrücken beim Standdienst. Auf dem iPhone nur, wenn die Seite als App auf dem Startbildschirm liegt (ab iOS 16.4). In der Demo werden nur Testnachrichten verschickt.
+- **Fahrten:** Hin- und Rückfahrt getrennt, Umsteigen (⇄), Fahrer dürfen Kinder aus ihrem Auto austragen, „Wir brauchen noch eine Fahrt“ mit „Nehme ich mit“.
+- **Neue Abhängigkeit:** `web-push` (steht in `package.json`, Netlify installiert sie beim Deploy automatisch).
+- Keine Datenmigration: neue Sammlungen `anwesenheit`, `trainingsausfall`, `fahrtbedarf`, `push/…`; bestehende Fahrten ohne Richtung gelten als „hin und zurück“.
+
+## Version 2.0: Module, Jugend und Erwachsene, Helferdienste, Mannschaftstour
+
+- **Module** (Verwaltung › Einstellungen › Module): Standdienst, Strichliste, Helferdienste, Zeitnehmer, Wäsche, Trikots, Fahrten, An- und Abmeldung, Infos, Termine, Abfragen, Kasse, Galerie, Erinnerungen. Ausgeschaltet heißt: verschwindet aus Menü, Startseite, Spielkarten, WhatsApp-Texten und Erinnerungen. Daten bleiben erhalten. Helferdienste sind standardmäßig aus, alles andere an.
+- **Mannschaftstyp** (Verwaltung › Mannschaft): „Jugend“ (wie bisher) oder „Erwachsene“. Bei Erwachsenen gibt es keinen Eltern-Zugang; der Spieler-Zugang (`SPIELER_PASSWORT`) hat dann die Rechte, die sonst Eltern haben, und alle Texte sprechen die Spieler direkt an. Name von Mannschaft und Verein ist einstellbar.
+- **Helferdienste:** frei anlegbare Dienste pro Heimspiel (Name, Personen, Minuten vor Anwurf oder „danach“). Fairness-Übersicht unter Spiele. X Tage vor dem Spiel (einstellbar) zeigt die Seite für offene Dienste, wer bisher am seltensten dran war; diese Spieler bzw. Familien bekommen eine Push-Erinnerung. Trainer und Kasse können Spieler direkt eintragen. Logik: `netlify/shared/dienste.js` (Server) und `dienstVorschlaegeC` in `public/app.js` (Seite).
+- **Termine/Touren:** mehrtägig (`bis`), Kosten pro Teilnehmer oder nur für zusätzliche Personen, Anzahlung mit Frist, Kasse bucht Anzahlung und Restzahlung mit einem Klick. Im Kalender-Abo als ganztägiger Mehrtages-Termin.
+- **Demo:** zwei Mannschaften mit getrennten Speichern (`daten` = C-Jugend, `daten-herren` = 1. Herren), Auswahl auf der Anmeldeseite (Cookie `demo_team`).
+- Keine Datenmigration. Ohne Änderungen in der Verwaltung verhält sich die Seite wie 1.7.
